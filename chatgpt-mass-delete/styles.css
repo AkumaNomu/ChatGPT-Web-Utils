@@ -7,12 +7,14 @@
   font-family: Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-/* ---------- Toolbar: docked card above the chat list in the sidebar ---------- */
+/* ---------- Toolbar: compact bar pinned to the sidebar's bottom-left ---------- */
 [data-chatgpt-mass-delete="toolbar"] {
-  position: sticky;
-  top: 8px;
-  z-index: 30;
-  margin: 8px;
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  z-index: 2147483646;
   padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;

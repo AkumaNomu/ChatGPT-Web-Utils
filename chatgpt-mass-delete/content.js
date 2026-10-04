@@ -61,20 +61,38 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Toolbar — docked above the chat list inside the sidebar (first child of
-  // the nav/aside holding the conversations), so it stays attached to the
-  // list it controls. The MutationObserver re-creates it if a rerender
-  // drops it.
+  // Toolbar — fixed compact bar at the sidebar's bottom-left corner.
+  // (A sidebar-docked variant was tried and ChatGPT's renderer drops it;
+  // this placement is proven visible and sits over the sidebar, not the
+  // chat stream.)
   // ---------------------------------------------------------------------------
-  function findSidebarContainer() {
-    const items = findConversations();
-    if (items.length === 0) return null;
-    const first = items[0];
+  function isDarkTheme() {
     return (
-      first.closest('nav') ||
-      first.closest('aside') ||
-      first.parentElement
+      document.documentElement.classList.contains('dark') ||
+      document.body?.classList.contains('dark') === true
     );
+  }
+
+  // Inline base styles: the manifest stylesheet is the primary path, but
+  // these guarantee the bar is visible even if it fails to apply.
+  function styleToolbarInline(toolbar) {
+    const dark = isDarkTheme();
+    toolbar.style.position = 'fixed';
+    toolbar.style.left = '12px';
+    toolbar.style.bottom = '12px';
+    toolbar.style.zIndex = '2147483646';
+    toolbar.style.width = 'max-content';
+    toolbar.style.maxWidth = 'calc(100vw - 24px)';
+    toolbar.style.background = dark ? 'rgba(33, 33, 33, 0.9)' : 'rgba(255, 255, 255, 0.92)';
+    toolbar.style.color = dark ? '#ececec' : '#0d0d0d';
+    toolbar.style.border = dark
+      ? '1px solid rgba(255, 255, 255, 0.1)'
+      : '1px solid rgba(0, 0, 0, 0.1)';
+    toolbar.style.borderRadius = '12px';
+    toolbar.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.5)';
+    toolbar.style.padding = '10px';
+    toolbar.style.fontSize = '13px';
+    toolbar.style.lineHeight = '1.4';
   }
 
   function getToolbarElements() {
@@ -103,8 +121,10 @@
       updateToolbar();
       return;
     }
-    const container = findSidebarContainer();
-    if (!container) return; // Retried by scheduleScan once chats render.
+    if (!document.body) {
+      setTimeout(scheduleScan, 300);
+      return;
+    }
 
     const toolbar = document.createElement('div');
     toolbar.setAttribute(PREFIX, 'toolbar');
@@ -140,9 +160,10 @@
 
     row.append(count, selectAll, clear, deleteBtn);
     toolbar.append(row, status);
+    styleToolbarInline(toolbar);
 
-    // Docked above the chat list: first child of the sidebar container.
-    container.insertBefore(toolbar, container.firstChild);
+    // Fixed at the sidebar's bottom-left, outside React-managed subtrees.
+    document.body.appendChild(toolbar);
     updateToolbar();
     console.info(
       '[ChatGPT Mass Delete] toolbar mounted (%d conversations detected)',
