@@ -692,6 +692,64 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Hydration-safe boot. ChatGPT server-renders the sidebar and React
+  // hydrates it after load: any foreign node inserted into that tree
+  // beforehand causes a hydration mismatch (React error #418) and React
+  // discards our nodes. So injection waits until the sidebar stops
+  // churning (quiet period) or a cap expires — whichever comes first.
+  // Later client-side rerenders merely drop our nodes (no crash) and the
+  // observer + interval below re-add them.
+  // ---------------------------------------------------------------------------
+  function findSidebarRoot() {
+    const items = findConversations();
+    if (items.length > 0) {
+      return items[0].closest('nav') || items[0].closest('aside') || null;
+    }
+    return document.querySelector('nav') || document.querySelector('aside');
+  }
+
+  function waitForSidebarSettled({ quietMs = 1200, capMs = 10000, pollMs = 300 } = {}) {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      let quietTimer = null;
+      let settled = false;
+      const obs = new MutationObserver(() => {
+        if (settled) return;
+        if (Date.now() - start > capMs) {
+          done();
+          return;
+        }
+        clearTimeout(quietTimer);
+        quietTimer = setTimeout(done, quietMs);
+      });
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(quietTimer);
+        clearInterval(poll);
+        obs.disconnect();
+        resolve();
+      };
+      const poll = setInterval(() => {
+        if (settled) {
+          clearInterval(poll);
+          return;
+        }
+        if (Date.now() - start > capMs) {
+          done();
+          return;
+        }
+        const root = findSidebarRoot();
+        if (root) {
+          clearInterval(poll);
+          obs.observe(root, { childList: true, subtree: true });
+          quietTimer = setTimeout(done, quietMs);
+        }
+      }, pollMs);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Dynamic sidebar — tolerate React rerenders without rebuilding the sidebar.
   // ---------------------------------------------------------------------------
   let scanScheduled = false;
@@ -769,15 +827,18 @@
     }
   }
 
-  function boot() {
-    // Document-level capture first: our handlers run before any ChatGPT
-    // row-level handler, so selection can never be swallowed.
-    document.addEventListener('pointerdown', onPointerDownCapture, true);
-    document.addEventListener('click', onClickCapture, true);
-    document.addEventListener('keydown', onKeyCapture, true);
-    document.addEventListener('keyup', onKeyCapture, true);
-    document.addEventListener('mousedown', onMouseDownOrDragCapture, true);
-    document.addEventListener('dragstart', onMouseDownOrDragCapture, true);
+  // Event handlers touch no DOM on registration: safe to attach at once —
+  // they only act on our own elements when events fire.
+  document.addEventListener('pointerdown', onPointerDownCapture, true);
+  document.addEventListener('click', onClickCapture, true);
+  document.addEventListener('keydown', onKeyCapture, true);
+  document.addEventListener('keyup', onKeyCapture, true);
+  document.addEventListener('mousedown', onMouseDownOrDragCapture, true);
+  document.addEventListener('dragstart', onMouseDownOrDragCapture, true);
+
+  async function boot() {
+    // Wait out React hydration before inserting anything into its tree.
+    await waitForSidebarSettled();
 
     ensureToolbar();
     ensureAllCheckboxes();
@@ -816,8 +877,8 @@
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot, { once: true });
+    document.addEventListener('DOMContentLoaded', () => void boot(), { once: true });
   } else {
-    boot();
+    void boot();
   }
 })();
