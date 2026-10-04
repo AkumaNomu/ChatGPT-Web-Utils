@@ -74,6 +74,34 @@
     };
   }
 
+  function isDarkTheme() {
+    return (
+      document.documentElement.classList.contains('dark') ||
+      document.body?.classList.contains('dark') === true
+    );
+  }
+
+  // Inline critical styles: the manifest stylesheet is the primary path,
+  // but these guarantee the panel is visible even if it fails to apply.
+  function styleToolbarInline(toolbar) {
+    const dark = isDarkTheme();
+    toolbar.style.position = 'fixed';
+    toolbar.style.top = '12px';
+    toolbar.style.left = '50%';
+    toolbar.style.transform = 'translateX(-50%)';
+    toolbar.style.zIndex = '2147483646';
+    toolbar.style.width = '360px';
+    toolbar.style.maxWidth = 'calc(100vw - 24px)';
+    toolbar.style.background = dark ? '#212121' : '#ffffff';
+    toolbar.style.color = dark ? '#ececec' : '#0d0d0d';
+    toolbar.style.border = '1px solid rgba(128, 128, 128, 0.4)';
+    toolbar.style.borderRadius = '14px';
+    toolbar.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.25)';
+    toolbar.style.padding = '12px';
+    toolbar.style.fontSize = '13px';
+    toolbar.style.lineHeight = '1.4';
+  }
+
   function makeButton(kind, label) {
     const btn = document.createElement('button');
     btn.setAttribute(PREFIX, kind);
@@ -133,12 +161,18 @@
     });
 
     head.append(title, count);
-    row.append(selectAll, clear);
-    toolbar.append(head, row, deleteBtn, status);
+    row.append(selectAll, clear, deleteBtn);
+    toolbar.append(head, row, status);
+    styleToolbarInline(toolbar);
 
-    // Fixed panel outside React's tree: always visible, never reconciled away.
+    // Top-center panel outside React's tree: always visible, never
+    // reconciled away.
     document.body.appendChild(toolbar);
     updateToolbar();
+    console.info(
+      '[ChatGPT Mass Delete] toolbar mounted (%d conversations detected)',
+      findConversations().length
+    );
   }
 
   function setStatus(message, mode) {
@@ -187,12 +221,30 @@
     btn.setAttribute('aria-checked', selected.has(id) ? 'true' : 'false');
     btn.setAttribute('aria-label', `Select conversation ${title}`.trim());
     btn.tabIndex = 0;
+    // Inline base styles so the box renders even without the stylesheet.
+    btn.style.width = '20px';
+    btn.style.height = '20px';
+    btn.style.display = 'inline-flex';
+    btn.style.alignItems = 'center';
+    btn.style.justifyContent = 'center';
+    btn.style.margin = '0';
+    btn.style.padding = '0';
+    btn.style.flex = '0 0 auto';
+    btn.style.border = '2px solid #888';
+    btn.style.borderRadius = '6px';
+    btn.style.background = selected.has(id) ? '#10a37f' : 'transparent';
+    btn.style.borderColor = selected.has(id) ? '#10a37f' : '';
+    btn.style.color = selected.has(id) ? '#ffffff' : '';
+    btn.style.cursor = 'pointer';
 
     const svg = document.createElementNS(CHECKBOX_SVG_NS, 'svg');
     svg.setAttribute('viewBox', '0 0 16 16');
     svg.setAttribute(PREFIX, 'checkbox-icon');
     svg.setAttribute('aria-hidden', 'true');
     svg.setAttribute('focusable', 'false');
+    svg.style.width = '13px';
+    svg.style.height = '13px';
+    svg.style.opacity = selected.has(id) ? '1' : '0';
 
     const path = document.createElementNS(CHECKBOX_SVG_NS, 'path');
     path.setAttribute('d', 'M3.2 8.6l3.3 3.3 6.3-7.8');
@@ -212,6 +264,17 @@
       btn.setAttribute('aria-checked', checked ? 'true' : 'false');
       btn.setAttribute(ID_ATTR, id);
       btn.setAttribute('aria-label', `Select conversation ${getConversationTitle(item)}`.trim());
+      // Inline checked visuals (stylesheet enhances with transitions/themes).
+      btn.style.background = checked ? '#10a37f' : 'transparent';
+      if (checked) {
+        btn.style.borderColor = '#10a37f';
+        btn.style.color = '#ffffff';
+      } else {
+        btn.style.borderColor = '';
+        btn.style.color = '';
+      }
+      const icon = btn.firstChild;
+      if (icon instanceof Element) icon.style.opacity = checked ? '1' : '0';
     }
     const wrapper = item.querySelector(`[${PREFIX}="checkbox-wrapper"]`);
     if (wrapper) wrapper.setAttribute(ID_ATTR, id);
@@ -263,6 +326,17 @@
     wrapper.setAttribute(PREFIX, 'checkbox-wrapper');
     wrapper.setAttribute(ID_ATTR, id);
     wrapper.title = 'Select conversation';
+    wrapper.style.display = 'inline-flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.justifyContent = 'center';
+    wrapper.style.alignSelf = 'center';
+    wrapper.style.flex = '0 0 auto';
+    wrapper.style.position = 'relative';
+    wrapper.style.zIndex = '1';
+    wrapper.style.marginRight = '6px';
+    wrapper.style.padding = '5px';
+    wrapper.style.borderRadius = '8px';
+    wrapper.style.cursor = 'pointer';
     // No per-node listeners: toggling is handled by document-level capture
     // handlers so ChatGPT row handlers can never swallow the event.
     wrapper.appendChild(createCheckboxButton(id, getConversationTitle(item)));
@@ -609,6 +683,23 @@
     if (relevant) scheduleScan();
   });
 
+  function diagnoseStyles() {
+    try {
+      const toolbar = document.querySelector(`[${PREFIX}="toolbar"]`);
+      if (!toolbar) {
+        console.info('[ChatGPT Mass Delete] toolbar check: toolbar node missing');
+        return;
+      }
+      const cs = getComputedStyle(toolbar);
+      console.info(
+        '[ChatGPT Mass Delete] toolbar check: position=%s top=%s left=%s display=%s z=%s bg=%s',
+        cs.position, cs.top, cs.left, cs.display, cs.zIndex, cs.backgroundColor
+      );
+    } catch {
+      console.info('[ChatGPT Mass Delete] toolbar check: unavailable');
+    }
+  }
+
   function boot() {
     // Document-level capture first: our handlers run before any ChatGPT
     // row-level handler, so selection can never be swallowed.
@@ -636,6 +727,7 @@
       '[ChatGPT Mass Delete] active — %d conversations detected',
       findConversations().length
     );
+    setTimeout(diagnoseStyles, 2000);
 
     // Catch late sidebar renders (cold load, SPA nav).
     for (const delay of [500, 1500, 3000, 6000]) {

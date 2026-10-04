@@ -2,12 +2,13 @@
    Every selector is scoped to [data-chatgpt-mass-delete] so ChatGPT's
    React app never accidentally matches extension elements. */
 
-/* ---------- Toolbar: fixed panel docked at the sidebar's bottom-left ---------- */
+/* ---------- Toolbar: floating bar pinned to the top-center ---------- */
 [data-chatgpt-mass-delete="toolbar"] {
   position: fixed;
-  left: 12px;
-  bottom: 12px;
-  width: 252px;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 360px;
   max-width: calc(100vw - 24px);
   z-index: 2147483646;
   background: #ffffff;
@@ -55,11 +56,11 @@
 [data-chatgpt-mass-delete="toolbar-row"] {
   display: flex;
   gap: 8px;
-  margin-bottom: 8px;
 }
 
 [data-chatgpt-mass-delete="toolbar-row"] button {
   flex: 1 1 0;
+  padding: 7px 6px;
 }
 
 [data-chatgpt-mass-delete="toolbar"] button {
@@ -86,7 +87,7 @@
 }
 
 [data-chatgpt-mass-delete="delete"] {
-  width: 100%;
+  flex: 1.4 1 0;
   border-color: #dc2626 !important;
   background: #dc2626 !important;
   color: #ffffff !important;
