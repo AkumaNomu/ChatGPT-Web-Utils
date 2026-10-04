@@ -61,33 +61,23 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Toolbar — fixed compact bar at the sidebar's bottom-left corner.
+  // Toolbar — fixed compact bar at the bottom-right corner.
   // (A sidebar-docked variant was tried and ChatGPT's renderer drops it;
-  // this placement is proven visible and sits over the sidebar, not the
-  // chat stream.)
+  // this placement is proven visible and sits clear of the chat stream.)
   // ---------------------------------------------------------------------------
-  function isDarkTheme() {
-    return (
-      document.documentElement.classList.contains('dark') ||
-      document.body?.classList.contains('dark') === true
-    );
-  }
-
   // Inline base styles: the manifest stylesheet is the primary path, but
   // these guarantee the bar is visible even if it fails to apply.
+  // Dark palette only, matching the site's dark styling.
   function styleToolbarInline(toolbar) {
-    const dark = isDarkTheme();
     toolbar.style.position = 'fixed';
-    toolbar.style.left = '12px';
+    toolbar.style.right = '12px';
     toolbar.style.bottom = '12px';
     toolbar.style.zIndex = '2147483646';
     toolbar.style.width = 'max-content';
     toolbar.style.maxWidth = 'calc(100vw - 24px)';
-    toolbar.style.background = dark ? 'rgba(33, 33, 33, 0.9)' : 'rgba(255, 255, 255, 0.92)';
-    toolbar.style.color = dark ? '#ececec' : '#0d0d0d';
-    toolbar.style.border = dark
-      ? '1px solid rgba(255, 255, 255, 0.1)'
-      : '1px solid rgba(0, 0, 0, 0.1)';
+    toolbar.style.background = 'rgba(33, 33, 33, 0.9)';
+    toolbar.style.color = '#ececec';
+    toolbar.style.border = '1px solid rgba(255, 255, 255, 0.1)';
     toolbar.style.borderRadius = '12px';
     toolbar.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.5)';
     toolbar.style.padding = '10px';

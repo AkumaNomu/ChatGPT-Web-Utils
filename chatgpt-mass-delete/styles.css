@@ -7,10 +7,10 @@
   font-family: Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-/* ---------- Toolbar: compact bar pinned to the sidebar's bottom-left ---------- */
+/* ---------- Toolbar: compact bar pinned to the bottom-right ---------- */
 [data-chatgpt-mass-delete="toolbar"] {
   position: fixed;
-  left: 12px;
+  right: 12px;
   bottom: 12px;
   width: max-content;
   max-width: calc(100vw - 24px);
@@ -274,91 +274,4 @@
 
 [data-chatgpt-mass-delete="dialog-confirm"]:hover {
   background: #dc2626;
-}
-
-/* ---------- Light mode ---------- */
-html.light [data-chatgpt-mass-delete="toolbar"],
-html:not(.dark) [data-chatgpt-mass-delete="toolbar"] {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(0, 0, 0, 0.1);
-  color: #0d0d0d;
-}
-
-@media (prefers-color-scheme: light) {
-  html:not(.dark) [data-chatgpt-mass-delete="toolbar"] {
-    background: rgba(255, 255, 255, 0.9);
-    border-color: rgba(0, 0, 0, 0.1);
-    color: #0d0d0d;
-  }
-}
-
-html.light [data-chatgpt-mass-delete="count"],
-html:not(.dark) [data-chatgpt-mass-delete="count"] {
-  background: rgba(0, 0, 0, 0.06);
-  color: #0d0d0d;
-}
-
-html.light [data-chatgpt-mass-delete="toolbar"] button,
-html:not(.dark) [data-chatgpt-mass-delete="toolbar"] button {
-  color: #0d0d0d;
-}
-
-html.light [data-chatgpt-mass-delete="select-all"]:hover:not(:disabled),
-html.light [data-chatgpt-mass-delete="clear"]:hover:not(:disabled),
-html:not(.dark) [data-chatgpt-mass-delete="select-all"]:hover:not(:disabled),
-html:not(.dark) [data-chatgpt-mass-delete="clear"]:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-html.light [data-chatgpt-mass-delete="status"],
-html:not(.dark) [data-chatgpt-mass-delete="status"] {
-  color: #6e6e6e;
-}
-
-html.light [data-chatgpt-mass-delete="checkbox"],
-html:not(.dark) [data-chatgpt-mass-delete="checkbox"] {
-  border-color: rgba(0, 0, 0, 0.3);
-}
-
-html.light [data-chatgpt-mass-delete="checkbox"]:hover,
-html:not(.dark) [data-chatgpt-mass-delete="checkbox"]:hover {
-  border-color: rgba(0, 0, 0, 0.6);
-}
-
-html.light [data-chatgpt-mass-delete="checkbox-wrapper"]:hover,
-html:not(.dark) [data-chatgpt-mass-delete="checkbox-wrapper"]:hover {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-html.light [data-sidebar-item="true"][data-chatgpt-mass-delete-selected="true"],
-html:not(.dark) [data-sidebar-item="true"][data-chatgpt-mass-delete-selected="true"] {
-  background: rgba(0, 0, 0, 0.05) !important;
-}
-
-html.light [data-chatgpt-mass-delete="dialog"],
-html:not(.dark) [data-chatgpt-mass-delete="dialog"] {
-  background: rgba(255, 255, 255, 0.95);
-  border-color: rgba(0, 0, 0, 0.1);
-  color: #0d0d0d;
-}
-
-html.light [data-chatgpt-mass-delete="dialog-title"],
-html:not(.dark) [data-chatgpt-mass-delete="dialog-title"] {
-  color: #0d0d0d;
-}
-
-html.light [data-chatgpt-mass-delete="dialog-body"],
-html:not(.dark) [data-chatgpt-mass-delete="dialog-body"] {
-  color: #6e6e6e;
-}
-
-html.light [data-chatgpt-mass-delete="dialog-cancel"],
-html:not(.dark) [data-chatgpt-mass-delete="dialog-cancel"] {
-  background: rgba(0, 0, 0, 0.05);
-  color: #0d0d0d;
-}
-
-html.light [data-chatgpt-mass-delete="dialog-cancel"]:hover,
-html:not(.dark) [data-chatgpt-mass-delete="dialog-cancel"]:hover {
-  background: rgba(0, 0, 0, 0.08);
 }
