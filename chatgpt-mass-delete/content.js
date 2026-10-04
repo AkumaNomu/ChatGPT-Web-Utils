@@ -531,6 +531,18 @@
   let tokenPromise = null;
   let tokenWarned = false;
 
+  // Safe one-line error summary. fetch TypeErrors never contain URLs or
+  // credentials, and our own thrown Errors carry only HTTP codes — so this
+  // can never leak the token.
+  function describeError(e) {
+    try {
+      if (e instanceof Error) return `${e.name}: ${e.message}`;
+      return String(e);
+    } catch {
+      return 'unknown error';
+    }
+  }
+
   async function fetchSessionToken() {
     const res = await fetch(SESSION_PATH, { method: 'GET', credentials: 'include' });
     if (!res.ok) throw new Error(`session HTTP ${res.status}`);
@@ -565,11 +577,12 @@
         ? await getAccessToken(true)
         : await getAccessToken();
       headers = { Authorization: `Bearer ${token}` };
-    } catch {
+    } catch (e) {
       if (!tokenWarned) {
         tokenWarned = true;
         console.warn(
-          '[ChatGPT Mass Delete] could not obtain session token; trying without Authorization header'
+          '[ChatGPT Mass Delete] session lookup failed (%s); trying without Authorization header',
+          describeError(e)
         );
       }
       headers = {};
@@ -600,12 +613,12 @@
         return deleteOneConversation(id, attempt + 1, refreshed);
       }
       return { ok: false, status: response.status };
-    } catch {
+    } catch (e) {
       if (attempt < MAX_RETRIES) {
         await sleep(1000 * 2 ** attempt + Math.random() * 500);
         return deleteOneConversation(id, attempt + 1, refreshed);
       }
-      return { ok: false, status: 0 };
+      return { ok: false, status: 0, error: describeError(e) };
     }
   }
 
@@ -662,9 +675,10 @@
           failed += 1;
           statusTally.set(res.status, (statusTally.get(res.status) || 0) + 1);
           console.warn(
-            '[ChatGPT Mass Delete] delete failed: id=%s http=%s',
+            '[ChatGPT Mass Delete] delete failed: id=%s http=%s%s',
             id,
-            res.status === 0 ? 'network-error' : res.status
+            res.status === 0 ? 'network-error' : res.status,
+            res.error ? ` (${res.error})` : ''
           );
           // Failed rows stay in the sidebar and stay selected for retry.
         }
