@@ -7,7 +7,7 @@
   font-family: Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-/* ---------- Toolbar: compact card right above the chats list ---------- */
+/* ---------- Header control: top checkbox + count + Delete ---------- */
 [data-chatgpt-mass-delete="toolbar"] {
   position: sticky;
   top: 8px;
@@ -28,43 +28,100 @@
 [data-chatgpt-mass-delete="toolbar-row"] {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
-[data-chatgpt-mass-delete="toolbar"] button {
+/* Guarantee hidden count/Delete stay hidden against any display rules. */
+[data-chatgpt-mass-delete="toolbar"] [hidden] {
+  display: none !important;
+}
+
+/* Tri-state top checkbox: empty / checked (all) / minus (some). */
+[data-chatgpt-mass-delete="topbox"] {
   appearance: none;
-  border: 1px solid transparent;
-  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  flex: 0 0 auto;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 5px;
   background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+[data-chatgpt-mass-delete="topbox"]:hover {
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+[data-chatgpt-mass-delete="topbox"]:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+[data-chatgpt-mass-delete="topbox"][aria-checked="true"],
+[data-chatgpt-mass-delete="topbox"][data-chatgpt-mass-delete-partial] {
+  background: #ececec;
+  border-color: #ececec;
+  color: #171717;
+}
+
+/* Glyphs: JS toggles inline display; these rules enhance with polish. */
+[data-chatgpt-mass-delete="topbox"] .glyph {
+  display: none;
+}
+
+[data-chatgpt-mass-delete="topbox"][aria-checked="true"] .glyph-check {
+  display: block;
+}
+
+[data-chatgpt-mass-delete="topbox"][data-chatgpt-mass-delete-partial] .glyph-minus {
+  display: block;
+}
+
+[data-chatgpt-mass-delete="topbox"][data-chatgpt-mass-delete-partial] .glyph-check {
+  display: none;
+}
+
+[data-chatgpt-mass-delete="count"] {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
   color: #ececec;
+  white-space: nowrap;
+}
+
+[data-chatgpt-mass-delete="delete"] {
+  appearance: none;
+  flex: 1 1 auto;
+  border: 1px solid #ef4444;
+  border-radius: 9999px;
+  background: #ef4444;
+  color: #ffffff;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   font-family: inherit;
   padding: 6px 12px;
   cursor: pointer;
   white-space: nowrap;
 }
 
-[data-chatgpt-mass-delete="clear"]:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.14);
+[data-chatgpt-mass-delete="delete"]:hover:not(:disabled) {
+  background: #dc2626;
+  border-color: #dc2626;
 }
 
-[data-chatgpt-mass-delete="toolbar"] button:disabled {
+[data-chatgpt-mass-delete="delete"]:disabled {
   opacity: 0.4;
   cursor: default;
-}
-
-[data-chatgpt-mass-delete="delete"] {
-  flex: 1 1 auto;
-  background: #ef4444 !important;
-  border-color: #ef4444 !important;
-  color: #ffffff !important;
-  font-weight: 600 !important;
-}
-
-[data-chatgpt-mass-delete="delete"]:hover:not(:disabled) {
-  background: #dc2626 !important;
-  border-color: #dc2626 !important;
 }
 
 [data-chatgpt-mass-delete="status"] {

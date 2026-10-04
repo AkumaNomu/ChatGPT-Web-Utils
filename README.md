@@ -8,15 +8,27 @@ success/failure tracking.
 Works on **Firefox** and **Chrome** (Manifest V3, no build step, no
 dependencies).
 
-## Features
+## Features (selection-mode UI)
 
-- Checkbox beside every sidebar conversation (custom painted, keyboard
-  accessible, preserves ChatGPT's open/drag/pin/options-menu behavior)
-- In-memory selection (`Set` of conversation IDs, no duplicates)
-- Compact bar above the chats list: `Clear`, `Delete (N)` (disabled at 0)
+The sidebar looks untouched until you select something:
+
+- A single tri-state checkbox at the top of the sidebar is the only
+  permanent control: empty (none selected) → click selects all;
+  checked (all selected) → click clears; minus (partial) → click
+  selects all. Double-click always clears, with no select-all flicker.
+- Selecting anything enters selection mode: per-conversation checkboxes
+  appear, the `N selected` count shows, and `Delete (N)` appears. At
+  zero selected, all three hide again and row checkboxes are removed
+  from the DOM.
+- Row checkboxes never interfere with opening, dragging, pinning, or
+  the options menu; clicking a row still opens the chat normally.
+- In-memory selection (`Set` of conversation IDs, no duplicates). An
+  explicit Select-All latches: newly loaded conversations join the
+  selection while it is active.
 - Confirmation dialog showing the exact count before anything is deleted
-- Live progress (`Deleting conversations… d / N`) and final summary
-  (`Deleted X of Y… N could not be deleted`)
+- Live progress (`Deleting… d / N`) and final summary
+  (`Deleted 7 conversations.` / `Deleted 5 of 7 conversations. 2 could
+  not be deleted.`)
 - Batch deletes with a concurrency limit of 4; retries HTTP 429/5xx with
   backoff; failures stay visible and selected for retry
 - Successes are removed from the sidebar immediately
@@ -73,11 +85,13 @@ affect loading or behavior. For distribution, package for the
 
 ## Usage
 
-1. Tick checkboxes in the sidebar (hover a row to reveal its box clearly;
-   checked rows stay highlighted)
-2. Click **Delete (N)** in the bar above the chats list
-3. Confirm the count in the dialog (Cancel aborts, Esc aborts)
-4. Watch progress; retry any failures (they remain selected)
+1. Click the checkbox at the top of the sidebar to select all chats
+   (double-click it to clear). Per-chat boxes appear; untick any you
+   want to keep, or tick individual rows (hover a row to reveal its box;
+   checked rows stay highlighted).
+2. Click **Delete (N)** in the same header area.
+3. Confirm the count in the dialog (Cancel aborts, Esc aborts).
+4. Watch progress; retry any failures (they remain selected).
 
 Tip: test on 1–2 throwaway chats first. Deletion is permanent.
 
@@ -148,4 +162,6 @@ relative `fetch()` paths don't resolve in this content-script
 context); `1.1.x` restyled to the neutral dark UI; `1.2.0` simplified
 the bar to Clear + Delete (N); `1.3.0` migrated to MV3 for Chrome;
 `1.4.0` added the cleanup/project addendum (settings, Upgrade and
-disclaimer removal, keep-projects-collapsed).
+disclaimer removal, keep-projects-collapsed);
+`1.5.0` rebuilt mass-delete as native-feeling selection mode (tri-state
+top checkbox, `Delete (N)`, Select-All latch, double-click to clear).

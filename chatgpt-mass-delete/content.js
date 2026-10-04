@@ -41,6 +41,11 @@
   /** @type {Set<string>} */
   const selected = new Set();
   let isDeleting = false;
+  // True after an explicit Select All: newly discovered conversations join
+  // the selection as they appear. Cleared by any deselect, clear, or delete.
+  let selectAllLatch = false;
+  // Pending single-click action on the top control (cancelled by dblclick).
+  let topClickTimer = null;
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -72,20 +77,23 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Toolbar — compact card placed right above the conversation list: a
-  // sibling BEFORE the list element (never inside it, so list
-  // virtualization can't eat it). A periodic check re-mounts it if a
-  // ChatGPT rerender drops it.
+  // Header control — lives at the top of the sidebar (first child of the
+  // nav/aside), moving naturally with it. Single row: tri-state top
+  // checkbox, count (selection mode only), Delete (selection mode only),
+  // plus a status line for progress/results. The MutationObserver +
+  // interval remount it if a rerender drops it.
   // ---------------------------------------------------------------------------
   function findToolbarAnchor() {
     const items = findConversations();
     if (items.length === 0) return null;
-    const list = items[0].parentElement;
-    if (!list) return null;
-    if (list.parentNode instanceof Element) {
+    const first = items[0];
+    const sidebar = first.closest('nav') || first.closest('aside');
+    if (sidebar) return { parent: sidebar, before: sidebar.firstChild };
+    const list = first.parentElement;
+    if (list && list.parentNode instanceof Element) {
       return { parent: list.parentNode, before: list };
     }
-    return { parent: list, before: list.firstChild };
+    return null;
   }
 
   function getToolbarElements() {
@@ -93,7 +101,8 @@
     if (!toolbar) return null;
     return {
       toolbar,
-      clear: toolbar.querySelector(`[${PREFIX}="clear"]`),
+      topbox: toolbar.querySelector(`[${PREFIX}="topbox"]`),
+      count: toolbar.querySelector(`[${PREFIX}="count"]`),
       deleteBtn: toolbar.querySelector(`[${PREFIX}="delete"]`),
       status: toolbar.querySelector(`[${PREFIX}="status"]`),
     };
@@ -122,24 +131,78 @@
     const row = document.createElement('div');
     row.setAttribute(PREFIX, 'toolbar-row');
 
-    const clear = makeButton('clear', 'Clear');
+    // Tri-state global control: empty (none) / checked (all) / minus (some).
+    const topbox = document.createElement('button');
+    topbox.type = 'button';
+    topbox.setAttribute(PREFIX, 'topbox');
+    topbox.setAttribute('role', 'checkbox');
+    topbox.setAttribute('aria-checked', 'false');
+    topbox.setAttribute('aria-label', 'Select all conversations');
+    topbox.title = 'Select all (double-click to clear)';
+    topbox.tabIndex = 0;
+    topbox.style.width = '18px';
+    topbox.style.height = '18px';
+    topbox.style.display = 'inline-flex';
+    topbox.style.alignItems = 'center';
+    topbox.style.justifyContent = 'center';
+    topbox.style.margin = '0';
+    topbox.style.padding = '0';
+    topbox.style.flex = '0 0 auto';
+    topbox.style.border = '1.5px solid #888';
+    topbox.style.borderRadius = '5px';
+    topbox.style.background = 'transparent';
+    topbox.style.cursor = 'pointer';
+
+    const svg = document.createElementNS(CHECKBOX_SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute(PREFIX, 'checkbox-icon');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    svg.style.width = '12px';
+    svg.style.height = '12px';
+    const checkPath = document.createElementNS(CHECKBOX_SVG_NS, 'path');
+    checkPath.setAttribute('d', 'M3.2 8.6l3.3 3.3 6.3-7.8');
+    checkPath.setAttribute('fill', 'none');
+    checkPath.setAttribute('stroke', 'currentColor');
+    checkPath.setAttribute('stroke-width', '2.4');
+    checkPath.setAttribute('stroke-linecap', 'round');
+    checkPath.setAttribute('stroke-linejoin', 'round');
+    checkPath.setAttribute('class', 'glyph glyph-check');
+    checkPath.style.display = 'none';
+    const minusPath = document.createElementNS(CHECKBOX_SVG_NS, 'path');
+    minusPath.setAttribute('d', 'M3.5 8h9');
+    minusPath.setAttribute('fill', 'none');
+    minusPath.setAttribute('stroke', 'currentColor');
+    minusPath.setAttribute('stroke-width', '2.4');
+    minusPath.setAttribute('stroke-linecap', 'round');
+    minusPath.setAttribute('class', 'glyph glyph-minus');
+    minusPath.style.display = 'none';
+    svg.append(checkPath, minusPath);
+    topbox.appendChild(svg);
+
+    const count = document.createElement('span');
+    count.setAttribute(PREFIX, 'count');
+    count.setAttribute('aria-live', 'polite');
+    count.hidden = true;
+
     const deleteBtn = makeButton('delete', 'Delete (0)');
+    deleteBtn.hidden = true;
 
     const status = document.createElement('div');
     status.setAttribute(PREFIX, 'status');
     status.setAttribute('aria-live', 'polite');
     status.hidden = true;
 
-    clear.addEventListener('click', (e) => {
-      e.stopPropagation();
-      clearSelection();
-    });
+    // Single/double click routing lives in the document-level capture
+    // handlers (onClickCapture / onTopboxDblclickCapture) so ChatGPT row
+    // handlers can never interfere. Stop local propagation as backup.
+    topbox.addEventListener('click', (e) => e.stopPropagation());
     deleteBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       void deleteSelected();
     });
 
-    row.append(clear, deleteBtn);
+    row.append(topbox, count, deleteBtn);
     toolbar.append(row, status);
 
     try {
@@ -168,13 +231,51 @@
     els.status.setAttribute(`${PREFIX}-status-mode`, mode || 'info');
   }
 
+  function allDetectedSelected() {
+    if (selected.size === 0) return false;
+    for (const item of findConversations()) {
+      const id = getConversationId(item);
+      if (!id || !selected.has(id)) return false;
+    }
+    return true;
+  }
+
+  function selectionSnapshot() {
+    if (selected.size === 0) return 'none';
+    return allDetectedSelected() ? 'all' : 'some';
+  }
+
   function updateToolbar() {
     const els = getToolbarElements();
-    if (!els) return;
+    if (!els || !els.topbox) return;
     const n = selected.size;
-    els.deleteBtn.disabled = n === 0 || isDeleting;
-    els.clear.disabled = n === 0 || isDeleting;
-    els.deleteBtn.textContent = `Delete (${n})`;
+    const all = allDetectedSelected();
+    const partial = n > 0 && !all;
+
+    // Tri-state top control (+ inline paint so it works without CSS).
+    els.topbox.setAttribute('aria-checked', all ? 'true' : (partial ? 'mixed' : 'false'));
+    if (partial) {
+      els.topbox.setAttribute(`${PREFIX}-partial`, 'true');
+    } else {
+      els.topbox.removeAttribute(`${PREFIX}-partial`);
+    }
+    els.topbox.style.background = n === 0 ? 'transparent' : '#ececec';
+    els.topbox.style.borderColor = n === 0 ? '' : '#ececec';
+    els.topbox.style.color = n === 0 ? '' : '#171717';
+    els.topbox.setAttribute('aria-label', all ? 'Clear selection' : 'Select all conversations');
+    const check = els.topbox.querySelector('.glyph-check');
+    const minus = els.topbox.querySelector('.glyph-minus');
+    if (check) check.style.display = all ? 'block' : 'none';
+    if (minus) minus.style.display = partial ? 'block' : 'none';
+
+    // Count + Delete exist only in selection mode.
+    els.count.hidden = n === 0;
+    els.deleteBtn.hidden = n === 0;
+    els.deleteBtn.disabled = isDeleting;
+    if (n > 0) {
+      els.count.textContent = n === 1 ? '1 selected' : `${n} selected`;
+      els.deleteBtn.textContent = `Delete (${n})`;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -286,29 +387,15 @@
 
     if (selected.has(id)) {
       selected.delete(id);
+      selectAllLatch = false; // Customized: newcomers stay unselected.
     } else {
       selected.add(id);
     }
-    for (const item of findItemForId(id)) {
-      paintRow(item, id, selected.has(id));
-    }
-    updateToolbar();
+    refreshSelectionUI();
   }
 
-  function injectCheckbox(item) {
-    if (!massDeleteEnabled()) return;
-    const id = getConversationId(item);
-    if (!id) return;
-
-    let wrapper = item.querySelector(`[${PREFIX}="checkbox-wrapper"]`);
-    if (wrapper) {
-      // Row may have been recycled for another conversation (virtualized
-      // list) — refresh the id and repaint from the Set.
-      syncCheckboxForItem(item, id);
-      return;
-    }
-
-    wrapper = document.createElement('span');
+  function injectWrapper(item, id) {
+    const wrapper = document.createElement('span');
     wrapper.setAttribute(PREFIX, 'checkbox-wrapper');
     wrapper.setAttribute(ID_ATTR, id);
     wrapper.title = 'Select conversation';
@@ -330,22 +417,43 @@
     // handlers so ChatGPT row handlers can never swallow the event.
     wrapper.appendChild(createCheckboxButton(id, getConversationTitle(item)));
     item.insertBefore(wrapper, item.firstChild);
-    if (selected.has(id)) {
-      item.setAttribute(SELECTED_ATTR, 'true');
-    }
   }
 
-  function ensureAllCheckboxes() {
-    for (const item of findConversations()) {
-      injectCheckbox(item);
+  // Selection-mode rendering (spec option 1): row checkboxes exist only
+  // while selected.size > 0, so the sidebar looks untouched otherwise.
+  // With the Select-All latch on, newly discovered rows join immediately.
+  function syncRowCheckboxes() {
+    if (!massDeleteEnabled()) return;
+    if (selectAllLatch) {
+      for (const item of findConversations()) {
+        const id = getConversationId(item);
+        if (id) selected.add(id);
+      }
     }
-  }
-
-  function syncAllCheckboxes() {
+    const selecting = selected.size > 0;
     for (const item of findConversations()) {
       const id = getConversationId(item);
-      if (id) syncCheckboxForItem(item, id);
+      const wrapper = item.querySelector(`[${PREFIX}="checkbox-wrapper"]`);
+      if (!id || !selecting) {
+        if (wrapper) wrapper.remove();
+        item.removeAttribute(SELECTED_ATTR);
+        continue;
+      }
+      if (!wrapper) {
+        injectWrapper(item, id);
+      } else {
+        // Row may have been recycled for another conversation
+        // (virtualized list) — repaint from the Set.
+        syncCheckboxForItem(item, id);
+        continue;
+      }
+      paintRow(item, id, selected.has(id));
     }
+  }
+
+  function refreshSelectionUI() {
+    syncRowCheckboxes();
+    updateToolbar();
   }
 
   function wrapperIdFromEventTarget(target) {
@@ -371,7 +479,16 @@
 
   // Fallback path: keyboard/screen-reader activation synthesizes click
   // without pointerdown. Suppressed after a pointerdown toggle by dedupe.
+  // Also routes top-control mouse clicks (with double-click priority).
   function onClickCapture(e) {
+    const t = e.target;
+    if (t instanceof Element && t.closest(`[${PREFIX}="topbox"]`)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.detail === 0) return; // Keyboard echo; keydown already acted.
+      topboxSingleClick();
+      return;
+    }
     const id = wrapperIdFromEventTarget(e.target);
     if (!id) return;
     e.preventDefault();
@@ -379,10 +496,34 @@
     toggleSelection(id);
   }
 
+  // Double-click on the top control always clears — cancelling any pending
+  // single-click action so there is no select-all flicker.
+  function onTopboxDblclickCapture(e) {
+    const t = e.target;
+    if (!(t instanceof Element)) return;
+    if (!t.closest(`[${PREFIX}="topbox"]`)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (topClickTimer) {
+      clearTimeout(topClickTimer);
+      topClickTimer = null;
+    }
+    clearSelection();
+  }
+
   function onKeyCapture(e) {
     const target = e.target;
     if (!(target instanceof Element)) return;
-    if (target.getAttribute(PREFIX) !== 'checkbox') return;
+    const kind = target.getAttribute(PREFIX);
+    if (kind === 'topbox') {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === 'keydown') topboxKeyboardActivate();
+      }
+      return;
+    }
+    if (kind !== 'checkbox') return;
     if (e.key === ' ' || e.key === 'Enter') {
       // Keydown Enter activates buttons; Space activates on keyup — cancel
       // both so the anchor never receives an activating click.
@@ -409,12 +550,48 @@
   // ---------------------------------------------------------------------------
   // Selection actions
   // ---------------------------------------------------------------------------
+  function selectAllDetected() {
+    if (isDeleting) return;
+    selectAllLatch = true;
+    for (const item of findConversations()) {
+      const id = getConversationId(item);
+      if (id) selected.add(id);
+    }
+    refreshSelectionUI();
+  }
+
   function clearSelection() {
     if (isDeleting) return;
+    selectAllLatch = false;
     selected.clear();
-    syncAllCheckboxes();
     setStatus('');
-    updateToolbar();
+    refreshSelectionUI();
+  }
+
+  // Top-control click routing with double-click priority: a single click
+  // waits 280ms; if the dblclick event arrives first the pending action
+  // is cancelled and the selection is cleared — never select-all flicker.
+  function topboxSingleClick() {
+    if (isDeleting) return;
+    if (topClickTimer) return; // 2nd click of a double-click: ignore.
+    const snapshot = selectionSnapshot();
+    topClickTimer = setTimeout(() => {
+      topClickTimer = null;
+      if (snapshot === 'all') {
+        clearSelection();
+      } else {
+        selectAllDetected();
+      }
+    }, 280);
+  }
+
+  function topboxKeyboardActivate() {
+    if (isDeleting) return;
+    if (selectionSnapshot() === 'all') {
+      clearSelection();
+    } else {
+      selectAllDetected();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -442,7 +619,7 @@
 
       const body = document.createElement('p');
       body.setAttribute(PREFIX, 'dialog-body');
-      body.textContent = 'This cannot be undone. Deleted conversations cannot be recovered.';
+      body.textContent = 'This cannot be undone.';
 
       const actions = document.createElement('div');
       actions.setAttribute(PREFIX, 'dialog-actions');
@@ -455,7 +632,7 @@
       const confirm = document.createElement('button');
       confirm.setAttribute(PREFIX, 'dialog-confirm');
       confirm.type = 'button';
-      confirm.textContent = count === 1 ? 'Delete' : `Delete ${count}`;
+      confirm.textContent = 'Delete';
 
       let settled = false;
       const done = (value) => {
@@ -601,17 +778,6 @@
     }
   }
 
-  function reasonForStatus(status) {
-    if (status === 0) return 'network error — the request was blocked or never sent';
-    if (status === 401 || status === 403) {
-      return `HTTP ${status} — ChatGPT rejected the request (authorization)`;
-    }
-    if (status === 404) return 'HTTP 404 — endpoint not found (ChatGPT may have changed its API)';
-    if (status === 429) return 'HTTP 429 — rate-limited by ChatGPT';
-    if (status >= 500 && status < 600) return `HTTP ${status} — ChatGPT server error`;
-    return `HTTP ${status}`;
-  }
-
   function removeConversationFromSidebar(id) {
     for (const item of findItemForId(id)) {
       item.remove();
@@ -639,7 +805,7 @@
 
     console.info('[ChatGPT Mass Delete] attempting %d deletion(s)', total);
 
-    setStatus(`Deleting conversations… 0 / ${total}`, 'progress');
+    setStatus(`Deleting… 0 / ${total}`, 'progress');
 
     async function worker() {
       while (cursor < ids.length) {
@@ -662,7 +828,7 @@
           // Failed rows stay in the sidebar and stay selected for retry.
         }
         done += 1;
-        setStatus(`Deleting conversations… ${done} / ${total}`, 'progress');
+        setStatus(`Deleting… ${done} / ${total}`, 'progress');
         updateToolbar();
       }
     }
@@ -675,33 +841,29 @@
     await Promise.all(workers);
 
     isDeleting = false;
-    syncAllCheckboxes();
-    updateToolbar();
+    selectAllLatch = false;
+    refreshSelectionUI();
 
     let message;
     let mode;
     const tallyText = Array.from(statusTally.entries())
       .map(([status, n]) => (status === 0 ? `network-error×${n}` : `HTTP ${status}×${n}`))
       .join(', ');
-    // Most common failure status drives the human-readable reason.
-    const topStatus = Array.from(statusTally.entries()).sort((a, b) => b[1] - a[1])[0]?.[0];
-    const reason = topStatus === undefined ? '' : ` (${reasonForStatus(topStatus)})`;
     if (failed === 0) {
       message = total === 1 ? 'Deleted 1 conversation.' : `Deleted ${succeeded} conversations.`;
       mode = 'success';
     } else if (succeeded === 0) {
       message = failed === 1
-        ? `Could not delete 1 conversation${reason}.`
-        : `Deleted 0 of ${total} conversations. ${failed} could not be deleted${reason}.`;
+        ? 'Could not delete 1 conversation.'
+        : `Deleted 0 of ${total} conversations. ${failed} could not be deleted.`;
       mode = 'error';
     } else {
       message = `Deleted ${succeeded} of ${total} conversations. ` +
-        `${failed} conversation${failed === 1 ? '' : 's'} could not be deleted${reason}.`;
+        `${failed} could not be deleted.`;
       mode = 'error';
     }
     setStatus(message, mode);
     console.info('[ChatGPT Mass Delete] %s%s', message, tallyText ? ` [${tallyText}]` : '');
-    updateToolbar();
   }
 
   // ---------------------------------------------------------------------------
@@ -775,7 +937,7 @@
       try {
         if (massDeleteEnabled()) {
           ensureToolbar();
-          ensureAllCheckboxes();
+          syncRowCheckboxes();
           updateToolbar();
         }
         // Coordinated hook: cleanup.js (Upgrade/projects) rides the same
@@ -855,6 +1017,7 @@
   // they only act on our own elements when events fire.
   document.addEventListener('pointerdown', onPointerDownCapture, true);
   document.addEventListener('click', onClickCapture, true);
+  document.addEventListener('dblclick', onTopboxDblclickCapture, true);
   document.addEventListener('keydown', onKeyCapture, true);
   document.addEventListener('keyup', onKeyCapture, true);
   document.addEventListener('mousedown', onMouseDownOrDragCapture, true);
@@ -865,7 +1028,7 @@
     await waitForSidebarSettled();
 
     ensureToolbar();
-    ensureAllCheckboxes();
+    syncRowCheckboxes();
     updateToolbar();
 
     // href/aria-label cover in-place row recycling (virtualized lists);
@@ -893,7 +1056,7 @@
     setInterval(() => {
       try {
         ensureToolbar();
-        ensureAllCheckboxes();
+        syncRowCheckboxes();
       } catch {
         // Never break the host page.
       }
