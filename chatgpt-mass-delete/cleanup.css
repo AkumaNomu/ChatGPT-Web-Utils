@@ -1,0 +1,16 @@
+/* ChatGPT cleanup — extension-owned hiding rules.
+   Disclaimer uses a stable ChatGPT selector directly (pure CSS, so
+   recreated nodes are hidden automatically). Everything else is tagged
+   by cleanup.js with data-chatgpt-cleanup-hidden and hidden here, which
+   keeps DOM manipulation minimal. */
+
+/* 2. Thread disclaimer: remove, including its layout space. */
+[data-testid="thread-disclaimer"] {
+  display: none !important;
+}
+
+/* 1 & 3. Extension-tagged containers: Upgrade wrappers and collapsed
+   project chat lists. */
+[data-chatgpt-cleanup-hidden] {
+  display: none !important;
+}

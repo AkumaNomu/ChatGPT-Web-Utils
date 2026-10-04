@@ -24,6 +24,17 @@
   const SELECTED_ATTR = 'data-chatgpt-mass-delete-selected';
   const ID_ATTR = 'data-chatgpt-mass-delete-id';
 
+  // Settings live in settings.js (runs first). Default to ON when the
+  // registry is unavailable so features never silently die.
+  function massDeleteEnabled() {
+    try {
+      if (window.__cmdSettings) return window.__cmdSettings.isEnabled('massDelete');
+      return true;
+    } catch {
+      return true;
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // State. Only conversation IDs are stored. Never tokens/cookies/sessions.
   // ---------------------------------------------------------------------------
@@ -97,6 +108,7 @@
   }
 
   function ensureToolbar() {
+    if (!massDeleteEnabled()) return;
     if (document.querySelector(`[${PREFIX}="toolbar"]`)) {
       updateToolbar();
       return;
@@ -284,6 +296,7 @@
   }
 
   function injectCheckbox(item) {
+    if (!massDeleteEnabled()) return;
     const id = getConversationId(item);
     if (!id) return;
 
@@ -760,9 +773,20 @@
     const run = () => {
       scanScheduled = false;
       try {
-        ensureToolbar();
-        ensureAllCheckboxes();
-        updateToolbar();
+        if (massDeleteEnabled()) {
+          ensureToolbar();
+          ensureAllCheckboxes();
+          updateToolbar();
+        }
+        // Coordinated hook: cleanup.js (Upgrade/projects) rides the same
+        // debounced scan instead of running a second observer.
+        try {
+          if (typeof window.__cmdCleanupScan === 'function') {
+            window.__cmdCleanupScan();
+          }
+        } catch {
+          // Never break the host page.
+        }
       } catch {
         // Never break the host page.
       }
