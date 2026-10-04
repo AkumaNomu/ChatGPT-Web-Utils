@@ -1,0 +1,243 @@
+/* ChatGPT Mass Delete — extension-owned styles only.
+   Every selector is scoped to [data-chatgpt-mass-delete] so ChatGPT's
+   React app never accidentally matches extension elements. */
+
+/* ---------- Toolbar ---------- */
+[data-chatgpt-mass-delete="toolbar"] {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: #f9f9f9;
+  color: #0d0d0d;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+[data-chatgpt-mass-delete="toolbar-row"] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+[data-chatgpt-mass-delete="toolbar"] button {
+  appearance: none;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  background: #ffffff;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+[data-chatgpt-mass-delete="toolbar"] button:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-chatgpt-mass-delete="toolbar"] button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+[data-chatgpt-mass-delete="delete"] {
+  border-color: rgba(220, 38, 38, 0.4) !important;
+  color: #b91c1c !important;
+}
+
+[data-chatgpt-mass-delete="delete"]:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.08) !important;
+}
+
+[data-chatgpt-mass-delete="count"] {
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+[data-chatgpt-mass-delete="status"] {
+  margin-top: 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+
+[data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="success"] {
+  color: #15803d;
+}
+
+[data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="error"] {
+  color: #b91c1c;
+}
+
+/* ---------- Checkbox injected into each conversation row ---------- */
+[data-chatgpt-mass-delete="checkbox-wrapper"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  margin-right: 8px;
+  padding: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+[data-chatgpt-mass-delete="checkbox-wrapper"]:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+[data-chatgpt-mass-delete="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  padding: 0;
+  flex: 0 0 auto;
+  cursor: pointer;
+  accent-color: #10a37f;
+}
+
+/* Selected-row highlight (attribute lives on the sidebar item itself). */
+[data-sidebar-item="true"][data-chatgpt-mass-delete-selected="true"] {
+  background: rgba(16, 163, 127, 0.12) !important;
+}
+
+/* ---------- Confirmation dialog ---------- */
+[data-chatgpt-mass-delete="overlay"] {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 16px;
+}
+
+[data-chatgpt-mass-delete="dialog"] {
+  width: min(420px, 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #ffffff;
+  color: #0d0d0d;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  padding: 20px;
+  font-size: 14px;
+}
+
+[data-chatgpt-mass-delete="dialog-title"] {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+[data-chatgpt-mass-delete="dialog-body"] {
+  margin: 0 0 16px 0;
+  opacity: 0.8;
+}
+
+[data-chatgpt-mass-delete="dialog-actions"] {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+[data-chatgpt-mass-delete="dialog-actions"] button {
+  appearance: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+[data-chatgpt-mass-delete="dialog-cancel"] {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: transparent;
+  color: inherit;
+}
+
+[data-chatgpt-mass-delete="dialog-cancel"]:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-chatgpt-mass-delete="dialog-confirm"] {
+  border: 1px solid #dc2626;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+[data-chatgpt-mass-delete="dialog-confirm"]:hover {
+  background: #b91c1c;
+}
+
+/* ---------- Dark mode (ChatGPT uses .dark on <html>; also honor OS) ---------- */
+html.dark [data-chatgpt-mass-delete="toolbar"],
+.dark [data-chatgpt-mass-delete="toolbar"] {
+  background: #171717;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  color: #ececec;
+}
+
+html.dark [data-chatgpt-mass-delete="toolbar"] button,
+.dark [data-chatgpt-mass-delete="toolbar"] button {
+  background: #212121;
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #ececec;
+}
+
+html.dark [data-chatgpt-mass-delete="toolbar"] button:hover:not(:disabled),
+.dark [data-chatgpt-mass-delete="toolbar"] button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html.dark [data-chatgpt-mass-delete="checkbox-wrapper"]:hover,
+.dark [data-chatgpt-mass-delete="checkbox-wrapper"]:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+html.dark [data-chatgpt-mass-delete="dialog"],
+.dark [data-chatgpt-mass-delete="dialog"] {
+  background: #212121;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #ececec;
+}
+
+html.dark [data-chatgpt-mass-delete="dialog-cancel"]:hover,
+.dark [data-chatgpt-mass-delete="dialog-cancel"]:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html.dark [data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="success"],
+.dark [data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="success"] {
+  color: #4ade80;
+}
+
+html.dark [data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="error"],
+.dark [data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="error"] {
+  color: #f87171;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not(.light) [data-chatgpt-mass-delete="toolbar"] {
+    background: #171717;
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+    color: #ececec;
+  }
+
+  html:not(.light) [data-chatgpt-mass-delete="toolbar"] button {
+    background: #212121;
+    border-color: rgba(255, 255, 255, 0.14);
+    color: #ececec;
+  }
+
+  html:not(.light) [data-chatgpt-mass-delete="dialog"] {
+    background: #212121;
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #ececec;
+  }
+}
