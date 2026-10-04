@@ -12,7 +12,11 @@
   const OPTIONS_TRIGGER_SELECTOR = '[data-conversation-options-trigger]';
   const CONVERSATION_ID_PATTERN = /\/c\/([0-9a-f-]{8,})/i;
 
-  const DELETE_PATH = (id) => `/backend-api/conversation/id/${encodeURIComponent(id)}`;
+  // Absolute URLs: relative paths do NOT resolve in this content-script
+  // context ("not a valid URL"), so build from the page origin explicitly.
+  const ORIGIN = window.location.origin; // https://chatgpt.com
+  const SESSION_PATH = `${ORIGIN}/api/auth/session`;
+  const DELETE_PATH = (id) => `${ORIGIN}/backend-api/conversation/id/${encodeURIComponent(id)}`;
   const CONCURRENCY = 4;
   const MAX_RETRIES = 3;
 
@@ -525,8 +529,8 @@
   // held ONLY in these in-memory variables. It is never stored (no
   // storage/cookies/DOM), never logged, and only ever sent as the
   // Authorization header on same-origin backend-api DELETE calls.
+  // (SESSION_PATH/DELETE_PATH are absolute — see config above.)
   // ---------------------------------------------------------------------------
-  const SESSION_PATH = '/api/auth/session';
   let cachedToken = null;
   let tokenPromise = null;
   let tokenWarned = false;
