@@ -518,17 +518,75 @@
   // Deletion API — same-origin, uses the existing ChatGPT session only.
   // Never touches auth headers, cookies, or tokens.
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Auth — approved exception to the no-credentials rule (user-approved):
+  // the backend-api rejects cookie-only requests, so the session's access
+  // token is fetched from ChatGPT's own same-origin session endpoint and
+  // held ONLY in these in-memory variables. It is never stored (no
+  // storage/cookies/DOM), never logged, and only ever sent as the
+  // Authorization header on same-origin backend-api DELETE calls.
+  // ---------------------------------------------------------------------------
+  const SESSION_PATH = '/api/auth/session';
+  let cachedToken = null;
+  let tokenPromise = null;
+  let tokenWarned = false;
+
+  async function fetchSessionToken() {
+    const res = await fetch(SESSION_PATH, { method: 'GET', credentials: 'include' });
+    if (!res.ok) throw new Error(`session HTTP ${res.status}`);
+    const data = await res.json().catch(() => null);
+    const token = data && data.accessToken;
+    if (typeof token !== 'string' || token.length === 0) {
+      throw new Error('no access token in session');
+    }
+    return token;
+  }
+
+  async function getAccessToken(forceRefresh = false) {
+    if (!forceRefresh && cachedToken) return cachedToken;
+    if (!forceRefresh && tokenPromise) return tokenPromise;
+    tokenPromise = fetchSessionToken();
+    try {
+      cachedToken = await tokenPromise;
+      return cachedToken;
+    } finally {
+      tokenPromise = null;
+    }
+  }
+
   // Returns { ok, status }. status is the HTTP code, or 0 when the
   // request never completed (network error / blocked). Only numeric
   // statuses and conversation IDs are ever logged — never headers,
   // bodies, tokens, or cookies.
-  async function deleteOneConversation(id, attempt = 0) {
+  async function deleteOneConversation(id, attempt = 0, refreshed = false) {
+    let headers = {};
+    try {
+      const token = refreshed
+        ? await getAccessToken(true)
+        : await getAccessToken();
+      headers = { Authorization: `Bearer ${token}` };
+    } catch {
+      if (!tokenWarned) {
+        tokenWarned = true;
+        console.warn(
+          '[ChatGPT Mass Delete] could not obtain session token; trying without Authorization header'
+        );
+      }
+      headers = {};
+    }
     try {
       const response = await fetch(DELETE_PATH(id), {
         method: 'DELETE',
         credentials: 'include',
+        headers,
       });
       if (response.ok) return { ok: true, status: response.status }; // HTTP 2xx → success
+
+      // Token may have expired mid-batch: refresh once and retry.
+      if (response.status === 401 && !refreshed) {
+        cachedToken = null;
+        return deleteOneConversation(id, attempt, true);
+      }
 
       const retryable = response.status === 429 || (response.status >= 500 && response.status < 600);
       if (retryable && attempt < MAX_RETRIES) {
@@ -539,13 +597,13 @@
           if (!Number.isNaN(seconds)) delay = Math.min(Math.max(seconds, 0) * 1000, 15000);
         }
         await sleep(delay + Math.random() * 500);
-        return deleteOneConversation(id, attempt + 1);
+        return deleteOneConversation(id, attempt + 1, refreshed);
       }
       return { ok: false, status: response.status };
     } catch {
       if (attempt < MAX_RETRIES) {
         await sleep(1000 * 2 ** attempt + Math.random() * 500);
-        return deleteOneConversation(id, attempt + 1);
+        return deleteOneConversation(id, attempt + 1, refreshed);
       }
       return { ok: false, status: 0 };
     }
