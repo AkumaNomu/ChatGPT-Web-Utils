@@ -50,12 +50,17 @@ touching call sites.
 - **Remove disclaimer**: hides `ChatGPT can make mistakes…` via
   `[data-testid="thread-disclaimer"] { display: none !important; }`
   (pure CSS — recreated nodes stay hidden automatically).
-- **Keep Projects collapsed**: project entries are detected via
-  `aria-expanded` regions, `/project*/` links, or header+list
-  structure (never class names). Their chat lists are hidden, single
-  clicks and hover reveals are suppressed at document capture, and the
-  second click of a double-click passes through so Project-home
-  navigation keeps working. Conversations and extension UI are exempt.
+- **Keep Projects collapsed**: project rows are identified primarily by
+  `[data-sidebar-item="true"][data-sidebar-keep-open="true"][role="button"]`
+  (fallbacks: `aria-expanded` regions, `/project*/` links, header+list
+  structure — never class names) and marked with
+  `data-chatgpt-mass-delete-project="true"`. Their chat lists are hidden
+  by CSS; every click on a row is suppressed at document capture before
+  ChatGPT can expand it. A lone click does nothing; two clicks within
+  ~450ms trigger the existing `Open project home` button (never a
+  hand-built URL) and the native `dblclick` is swallowed. Clicks from
+  the row's own trailing/options buttons, plain conversation rows, and
+  extension UI always pass through; pointer events stay enabled.
 
 Note: Select-all and the selection count were intentionally removed in
 1.2.0 and stay out; the bar is Clear + `Delete (N)` only.

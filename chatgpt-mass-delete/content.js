@@ -10,6 +10,12 @@
   // ---------------------------------------------------------------------------
   const SIDEBAR_ITEM_SELECTOR = '[data-sidebar-item="true"]';
   const OPTIONS_TRIGGER_SELECTOR = '[data-conversation-options-trigger]';
+  // Project rows carry data-sidebar-item too — keep-open="true" tells them
+  // apart. Mass delete only ever handles real conversations.
+  const PROJECT_ROW_SELECTOR =
+    '[data-sidebar-item="true"][data-sidebar-keep-open="true"][role="button"]';
+  const CONVERSATION_SELECTOR =
+    '[data-sidebar-item="true"]:not([data-sidebar-keep-open="true"])';
   const CONVERSATION_ID_PATTERN = /\/c\/([0-9a-f-]{8,})/i;
 
   // Absolute URLs: relative paths do NOT resolve in this content-script
@@ -69,7 +75,7 @@
   }
 
   function findConversations() {
-    return Array.from(document.querySelectorAll(SIDEBAR_ITEM_SELECTOR));
+    return Array.from(document.querySelectorAll(CONVERSATION_SELECTOR));
   }
 
   function findItemForId(id) {
