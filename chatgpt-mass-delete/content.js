@@ -518,13 +518,17 @@
   // Deletion API — same-origin, uses the existing ChatGPT session only.
   // Never touches auth headers, cookies, or tokens.
   // ---------------------------------------------------------------------------
+  // Returns { ok, status }. status is the HTTP code, or 0 when the
+  // request never completed (network error / blocked). Only numeric
+  // statuses and conversation IDs are ever logged — never headers,
+  // bodies, tokens, or cookies.
   async function deleteOneConversation(id, attempt = 0) {
     try {
       const response = await fetch(DELETE_PATH(id), {
         method: 'DELETE',
         credentials: 'include',
       });
-      if (response.ok) return true; // HTTP 2xx → success
+      if (response.ok) return { ok: true, status: response.status }; // HTTP 2xx → success
 
       const retryable = response.status === 429 || (response.status >= 500 && response.status < 600);
       if (retryable && attempt < MAX_RETRIES) {
@@ -537,14 +541,25 @@
         await sleep(delay + Math.random() * 500);
         return deleteOneConversation(id, attempt + 1);
       }
-      return false;
+      return { ok: false, status: response.status };
     } catch {
       if (attempt < MAX_RETRIES) {
         await sleep(1000 * 2 ** attempt + Math.random() * 500);
         return deleteOneConversation(id, attempt + 1);
       }
-      return false;
+      return { ok: false, status: 0 };
     }
+  }
+
+  function reasonForStatus(status) {
+    if (status === 0) return 'network error — the request was blocked or never sent';
+    if (status === 401 || status === 403) {
+      return `HTTP ${status} — ChatGPT rejected the request (authorization)`;
+    }
+    if (status === 404) return 'HTTP 404 — endpoint not found (ChatGPT may have changed its API)';
+    if (status === 429) return 'HTTP 429 — rate-limited by ChatGPT';
+    if (status >= 500 && status < 600) return `HTTP ${status} — ChatGPT server error`;
+    return `HTTP ${status}`;
   }
 
   function removeConversationFromSidebar(id) {
@@ -569,6 +584,10 @@
     let succeeded = 0;
     let failed = 0;
     let cursor = 0;
+    /** @type {Map<number, number>} */
+    const statusTally = new Map();
+
+    console.info('[ChatGPT Mass Delete] attempting %d deletion(s)', total);
 
     setStatus(`Deleting conversations… 0 / ${total}`, 'progress');
 
@@ -576,13 +595,19 @@
       while (cursor < ids.length) {
         const id = ids[cursor];
         cursor += 1;
-        const ok = await deleteOneConversation(id);
-        if (ok) {
+        const res = await deleteOneConversation(id);
+        if (res.ok) {
           succeeded += 1;
           selected.delete(id);
           removeConversationFromSidebar(id);
         } else {
           failed += 1;
+          statusTally.set(res.status, (statusTally.get(res.status) || 0) + 1);
+          console.warn(
+            '[ChatGPT Mass Delete] delete failed: id=%s http=%s',
+            id,
+            res.status === 0 ? 'network-error' : res.status
+          );
           // Failed rows stay in the sidebar and stay selected for retry.
         }
         done += 1;
@@ -604,21 +629,27 @@
 
     let message;
     let mode;
+    const tallyText = Array.from(statusTally.entries())
+      .map(([status, n]) => (status === 0 ? `network-error×${n}` : `HTTP ${status}×${n}`))
+      .join(', ');
+    // Most common failure status drives the human-readable reason.
+    const topStatus = Array.from(statusTally.entries()).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const reason = topStatus === undefined ? '' : ` (${reasonForStatus(topStatus)})`;
     if (failed === 0) {
       message = total === 1 ? 'Deleted 1 conversation.' : `Deleted ${succeeded} conversations.`;
       mode = 'success';
     } else if (succeeded === 0) {
       message = failed === 1
-        ? 'Could not delete 1 conversation.'
-        : `Deleted 0 of ${total} conversations. ${failed} conversations could not be deleted.`;
+        ? `Could not delete 1 conversation${reason}.`
+        : `Deleted 0 of ${total} conversations. ${failed} could not be deleted${reason}.`;
       mode = 'error';
     } else {
       message = `Deleted ${succeeded} of ${total} conversations. ` +
-        `${failed} conversation${failed === 1 ? '' : 's'} could not be deleted.`;
+        `${failed} conversation${failed === 1 ? '' : 's'} could not be deleted${reason}.`;
       mode = 'error';
     }
     setStatus(message, mode);
-    console.info('[ChatGPT Mass Delete] %s', message);
+    console.info('[ChatGPT Mass Delete] %s%s', message, tallyText ? ` [${tallyText}]` : '');
     updateToolbar();
   }
 
