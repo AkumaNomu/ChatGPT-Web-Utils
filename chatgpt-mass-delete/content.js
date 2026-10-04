@@ -61,28 +61,20 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Toolbar — fixed compact bar at the bottom-right corner.
-  // (A sidebar-docked variant was tried and ChatGPT's renderer drops it;
-  // this placement is proven visible and sits clear of the chat stream.)
+  // Toolbar — compact card placed right above the conversation list: a
+  // sibling BEFORE the list element (never inside it, so list
+  // virtualization can't eat it). A periodic check re-mounts it if a
+  // ChatGPT rerender drops it.
   // ---------------------------------------------------------------------------
-  // Inline base styles: the manifest stylesheet is the primary path, but
-  // these guarantee the bar is visible even if it fails to apply.
-  // Dark palette only, matching the site's dark styling.
-  function styleToolbarInline(toolbar) {
-    toolbar.style.position = 'fixed';
-    toolbar.style.right = '12px';
-    toolbar.style.bottom = '12px';
-    toolbar.style.zIndex = '2147483646';
-    toolbar.style.width = 'max-content';
-    toolbar.style.maxWidth = 'calc(100vw - 24px)';
-    toolbar.style.background = 'rgba(33, 33, 33, 0.9)';
-    toolbar.style.color = '#ececec';
-    toolbar.style.border = '1px solid rgba(255, 255, 255, 0.1)';
-    toolbar.style.borderRadius = '12px';
-    toolbar.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.5)';
-    toolbar.style.padding = '10px';
-    toolbar.style.fontSize = '13px';
-    toolbar.style.lineHeight = '1.4';
+  function findToolbarAnchor() {
+    const items = findConversations();
+    if (items.length === 0) return null;
+    const list = items[0].parentElement;
+    if (!list) return null;
+    if (list.parentNode instanceof Element) {
+      return { parent: list.parentNode, before: list };
+    }
+    return { parent: list, before: list.firstChild };
   }
 
   function getToolbarElements() {
@@ -90,9 +82,7 @@
     if (!toolbar) return null;
     return {
       toolbar,
-      selectAll: toolbar.querySelector(`[${PREFIX}="select-all"]`),
       clear: toolbar.querySelector(`[${PREFIX}="clear"]`),
-      count: toolbar.querySelector(`[${PREFIX}="count"]`),
       deleteBtn: toolbar.querySelector(`[${PREFIX}="delete"]`),
       status: toolbar.querySelector(`[${PREFIX}="status"]`),
     };
@@ -111,10 +101,8 @@
       updateToolbar();
       return;
     }
-    if (!document.body) {
-      setTimeout(scheduleScan, 300);
-      return;
-    }
+    const anchor = findToolbarAnchor();
+    if (!anchor) return; // Retried by scans + interval once chats render.
 
     const toolbar = document.createElement('div');
     toolbar.setAttribute(PREFIX, 'toolbar');
@@ -122,23 +110,14 @@
     const row = document.createElement('div');
     row.setAttribute(PREFIX, 'toolbar-row');
 
-    const count = document.createElement('span');
-    count.setAttribute(PREFIX, 'count');
-    count.setAttribute('aria-live', 'polite');
-
-    const selectAll = makeButton('select-all', 'Select all');
     const clear = makeButton('clear', 'Clear');
-    const deleteBtn = makeButton('delete', 'Delete selected');
+    const deleteBtn = makeButton('delete', 'Delete (0)');
 
     const status = document.createElement('div');
     status.setAttribute(PREFIX, 'status');
     status.setAttribute('aria-live', 'polite');
     status.hidden = true;
 
-    selectAll.addEventListener('click', (e) => {
-      e.stopPropagation();
-      selectAllConversations();
-    });
     clear.addEventListener('click', (e) => {
       e.stopPropagation();
       clearSelection();
@@ -148,12 +127,14 @@
       void deleteSelected();
     });
 
-    row.append(count, selectAll, clear, deleteBtn);
+    row.append(clear, deleteBtn);
     toolbar.append(row, status);
-    styleToolbarInline(toolbar);
 
-    // Fixed at the sidebar's bottom-left, outside React-managed subtrees.
-    document.body.appendChild(toolbar);
+    try {
+      anchor.parent.insertBefore(toolbar, anchor.before);
+    } catch {
+      return; // Unexpected structure — retry on next scan.
+    }
     updateToolbar();
     console.info(
       '[ChatGPT Mass Delete] toolbar mounted (%d conversations detected)',
@@ -179,11 +160,9 @@
     const els = getToolbarElements();
     if (!els) return;
     const n = selected.size;
-    els.count.textContent = n === 1 ? '1 selected' : `${n} selected`;
     els.deleteBtn.disabled = n === 0 || isDeleting;
-    els.selectAll.disabled = isDeleting;
     els.clear.disabled = n === 0 || isDeleting;
-    els.deleteBtn.textContent = n === 0 ? 'Delete' : `Delete (${n})`;
+    els.deleteBtn.textContent = `Delete (${n})`;
   }
 
   // ---------------------------------------------------------------------------
@@ -417,16 +396,6 @@
   // ---------------------------------------------------------------------------
   // Selection actions
   // ---------------------------------------------------------------------------
-  function selectAllConversations() {
-    if (isDeleting) return;
-    for (const item of findConversations()) {
-      const id = getConversationId(item);
-      if (id) selected.add(id);
-    }
-    syncAllCheckboxes();
-    updateToolbar();
-  }
-
   function clearSelection() {
     if (isDeleting) return;
     selected.clear();
@@ -833,6 +802,17 @@
     for (const delay of [500, 1500, 3000, 6000]) {
       setTimeout(scheduleScan, delay);
     }
+
+    // Self-heal: if a ChatGPT rerender drops the docked bar, remount it.
+    // Cheap (one querySelector + list scan) and inert when all is well.
+    setInterval(() => {
+      try {
+        ensureToolbar();
+        ensureAllCheckboxes();
+      } catch {
+        // Never break the host page.
+      }
+    }, 3000);
   }
 
   if (document.readyState === 'loading') {
