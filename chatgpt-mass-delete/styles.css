@@ -2,41 +2,82 @@
    Every selector is scoped to [data-chatgpt-mass-delete] so ChatGPT's
    React app never accidentally matches extension elements. */
 
-/* ---------- Toolbar ---------- */
+/* ---------- Toolbar: fixed panel docked at the sidebar's bottom-left ---------- */
 [data-chatgpt-mass-delete="toolbar"] {
-  position: sticky;
-  top: 0;
-  z-index: 30;
-  padding: 8px 10px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  background: #f9f9f9;
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  width: 252px;
+  max-width: calc(100vw - 24px);
+  z-index: 2147483646;
+  background: #ffffff;
   color: #0d0d0d;
-  font-size: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  font-size: 13px;
   line-height: 1.4;
+  font-family: inherit;
+}
+
+[data-chatgpt-mass-delete="toolbar-head"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+[data-chatgpt-mass-delete="toolbar-title"] {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+[data-chatgpt-mass-delete="count"] {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  color: inherit;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+[data-chatgpt-mass-delete="count"][data-chatgpt-mass-delete-active] {
+  background: rgba(16, 163, 127, 0.16);
+  color: #0b7a5c;
+  font-weight: 600;
+  opacity: 1;
 }
 
 [data-chatgpt-mass-delete="toolbar-row"] {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+[data-chatgpt-mass-delete="toolbar-row"] button {
+  flex: 1 1 0;
 }
 
 [data-chatgpt-mass-delete="toolbar"] button {
   appearance: none;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 9px;
+  background: #f4f4f4;
   color: inherit;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
-  padding: 4px 10px;
+  font-family: inherit;
+  padding: 7px 10px;
   cursor: pointer;
   white-space: nowrap;
 }
 
 [data-chatgpt-mass-delete="toolbar"] button:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.07);
 }
 
 [data-chatgpt-mass-delete="toolbar"] button:disabled {
@@ -45,23 +86,20 @@
 }
 
 [data-chatgpt-mass-delete="delete"] {
-  border-color: rgba(220, 38, 38, 0.4) !important;
-  color: #b91c1c !important;
+  width: 100%;
+  border-color: #dc2626 !important;
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
 }
 
 [data-chatgpt-mass-delete="delete"]:hover:not(:disabled) {
-  background: rgba(220, 38, 38, 0.08) !important;
-}
-
-[data-chatgpt-mass-delete="count"] {
-  margin-inline-start: auto;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.8;
-  white-space: nowrap;
+  background: #b91c1c !important;
+  border-color: #b91c1c !important;
 }
 
 [data-chatgpt-mass-delete="status"] {
-  margin-top: 6px;
+  margin-top: 8px;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   opacity: 0.9;
@@ -69,41 +107,87 @@
 
 [data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="success"] {
   color: #15803d;
+  font-weight: 500;
 }
 
 [data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="error"] {
   color: #b91c1c;
+  font-weight: 500;
 }
 
-/* ---------- Checkbox injected into each conversation row ---------- */
+[data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="progress"] {
+  opacity: 0.75;
+}
+
+/* ---------- Custom checkbox injected into each conversation row ---------- */
 [data-chatgpt-mass-delete="checkbox-wrapper"] {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
+  align-self: center;
   justify-content: center;
   flex: 0 0 auto;
-  margin-right: 8px;
-  padding: 2px;
-  border-radius: 4px;
+  margin-right: 6px;
+  padding: 5px;
+  border-radius: 8px;
   cursor: pointer;
 }
 
 [data-chatgpt-mass-delete="checkbox-wrapper"]:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: rgba(0, 0, 0, 0.07);
 }
 
 [data-chatgpt-mass-delete="checkbox"] {
-  width: 15px;
-  height: 15px;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
   margin: 0;
   padding: 0;
   flex: 0 0 auto;
+  border: 2px solid rgba(110, 110, 110, 0.7);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
   cursor: pointer;
-  accent-color: #10a37f;
+}
+
+[data-chatgpt-mass-delete="checkbox"]:hover {
+  border-color: #10a37f;
+  box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.18);
+}
+
+[data-chatgpt-mass-delete="checkbox"]:focus-visible {
+  outline: 2px solid #10a37f;
+  outline-offset: 2px;
+}
+
+[data-chatgpt-mass-delete="checkbox"][aria-checked="true"] {
+  background: #10a37f;
+  border-color: #10a37f;
+  color: #ffffff;
+}
+
+[data-chatgpt-mass-delete="checkbox-icon"] {
+  width: 13px;
+  height: 13px;
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+[data-chatgpt-mass-delete="checkbox"][aria-checked="true"] [data-chatgpt-mass-delete="checkbox-icon"] {
+  opacity: 1;
+  transform: scale(1);
 }
 
 /* Selected-row highlight (attribute lives on the sidebar item itself). */
 [data-sidebar-item="true"][data-chatgpt-mass-delete-selected="true"] {
-  background: rgba(16, 163, 127, 0.12) !important;
+  background: rgba(16, 163, 127, 0.14) !important;
+  box-shadow: inset 3px 0 0 #10a37f;
 }
 
 /* ---------- Confirmation dialog ---------- */
@@ -120,38 +204,67 @@
 
 [data-chatgpt-mass-delete="dialog"] {
   width: min(420px, 100%);
-  border-radius: 12px;
+  border-radius: 14px;
   border: 1px solid rgba(0, 0, 0, 0.1);
   background: #ffffff;
   color: #0d0d0d;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
-  padding: 20px;
+  padding: 22px;
   font-size: 14px;
+  font-family: inherit;
+  text-align: center;
+  animation: cmd-pop 0.14s ease-out;
+}
+
+@keyframes cmd-pop {
+  from {
+    transform: scale(0.96) translateY(4px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+[data-chatgpt-mass-delete="dialog-icon"] {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 12px auto;
+  border-radius: 50%;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 44px;
 }
 
 [data-chatgpt-mass-delete="dialog-title"] {
   margin: 0 0 8px 0;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
 }
 
 [data-chatgpt-mass-delete="dialog-body"] {
-  margin: 0 0 16px 0;
-  opacity: 0.8;
+  margin: 0 0 18px 0;
+  opacity: 0.75;
+  font-size: 13.5px;
 }
 
 [data-chatgpt-mass-delete="dialog-actions"] {
   display: flex;
-  justify-content: flex-end;
+  justify-content: stretch;
   gap: 8px;
 }
 
 [data-chatgpt-mass-delete="dialog-actions"] button {
   appearance: none;
-  border-radius: 8px;
+  flex: 1 1 0;
+  border-radius: 9px;
   font-size: 14px;
-  font-weight: 500;
-  padding: 8px 16px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 10px 16px;
   cursor: pointer;
 }
 
@@ -178,26 +291,42 @@
 /* ---------- Dark mode (ChatGPT uses .dark on <html>; also honor OS) ---------- */
 html.dark [data-chatgpt-mass-delete="toolbar"],
 .dark [data-chatgpt-mass-delete="toolbar"] {
-  background: #171717;
-  border-bottom-color: rgba(255, 255, 255, 0.1);
+  background: #212121;
+  border-color: rgba(255, 255, 255, 0.14);
   color: #ececec;
+}
+
+html.dark [data-chatgpt-mass-delete="count"],
+.dark [data-chatgpt-mass-delete="count"] {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+html.dark [data-chatgpt-mass-delete="count"][data-chatgpt-mass-delete-active],
+.dark [data-chatgpt-mass-delete="count"][data-chatgpt-mass-delete-active] {
+  background: rgba(16, 163, 127, 0.25);
+  color: #4ade80;
 }
 
 html.dark [data-chatgpt-mass-delete="toolbar"] button,
 .dark [data-chatgpt-mass-delete="toolbar"] button {
-  background: #212121;
+  background: #2f2f2f;
   border-color: rgba(255, 255, 255, 0.14);
   color: #ececec;
 }
 
 html.dark [data-chatgpt-mass-delete="toolbar"] button:hover:not(:disabled),
 .dark [data-chatgpt-mass-delete="toolbar"] button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 html.dark [data-chatgpt-mass-delete="checkbox-wrapper"]:hover,
 .dark [data-chatgpt-mass-delete="checkbox-wrapper"]:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+html.dark [data-chatgpt-mass-delete="checkbox"],
+.dark [data-chatgpt-mass-delete="checkbox"] {
+  border-color: rgba(200, 200, 200, 0.6);
 }
 
 html.dark [data-chatgpt-mass-delete="dialog"],
@@ -224,12 +353,6 @@ html.dark [data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mo
 
 @media (prefers-color-scheme: dark) {
   html:not(.light) [data-chatgpt-mass-delete="toolbar"] {
-    background: #171717;
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-    color: #ececec;
-  }
-
-  html:not(.light) [data-chatgpt-mass-delete="toolbar"] button {
     background: #212121;
     border-color: rgba(255, 255, 255, 0.14);
     color: #ececec;

@@ -18,6 +18,7 @@
 
   const PREFIX = 'data-chatgpt-mass-delete';
   const SELECTED_ATTR = 'data-chatgpt-mass-delete-selected';
+  const ID_ATTR = 'data-chatgpt-mass-delete-id';
 
   // ---------------------------------------------------------------------------
   // State. Only conversation IDs are stored. Never tokens/cookies/sessions.
@@ -51,20 +52,15 @@
     return Array.from(document.querySelectorAll(SIDEBAR_ITEM_SELECTOR));
   }
 
-  // ---------------------------------------------------------------------------
-  // Toolbar
-  // ---------------------------------------------------------------------------
-  function findSidebarContainer() {
-    const items = findConversations();
-    if (items.length === 0) return null;
-    const first = items[0];
-    return (
-      first.closest('nav') ||
-      first.closest('aside') ||
-      first.parentElement
-    );
+  function findItemForId(id) {
+    return findConversations().filter((item) => getConversationId(item) === id);
   }
 
+  // ---------------------------------------------------------------------------
+  // Toolbar — fixed panel docked at the sidebar's bottom-left, appended to
+  // <body> OUTSIDE ChatGPT's React tree so rerenders can never remove,
+  // relocate, or hide it.
+  // ---------------------------------------------------------------------------
   function getToolbarElements() {
     const toolbar = document.querySelector(`[${PREFIX}="toolbar"]`);
     if (!toolbar) return null;
@@ -78,38 +74,45 @@
     };
   }
 
+  function makeButton(kind, label) {
+    const btn = document.createElement('button');
+    btn.setAttribute(PREFIX, kind);
+    btn.type = 'button';
+    btn.textContent = label;
+    return btn;
+  }
+
   function ensureToolbar() {
     if (document.querySelector(`[${PREFIX}="toolbar"]`)) {
       updateToolbar();
       return;
     }
-    const container = findSidebarContainer();
-    if (!container) return;
+    if (!document.body) {
+      setTimeout(scheduleScan, 300);
+      return;
+    }
 
     const toolbar = document.createElement('div');
     toolbar.setAttribute(PREFIX, 'toolbar');
 
-    const row = document.createElement('div');
-    row.setAttribute(PREFIX, 'toolbar-row');
+    const head = document.createElement('div');
+    head.setAttribute(PREFIX, 'toolbar-head');
 
-    const selectAll = document.createElement('button');
-    selectAll.setAttribute(PREFIX, 'select-all');
-    selectAll.type = 'button';
-    selectAll.textContent = 'Select all';
-
-    const clear = document.createElement('button');
-    clear.setAttribute(PREFIX, 'clear');
-    clear.type = 'button';
-    clear.textContent = 'Clear selection';
+    const title = document.createElement('span');
+    title.setAttribute(PREFIX, 'toolbar-title');
+    title.textContent = 'Mass delete';
 
     const count = document.createElement('span');
     count.setAttribute(PREFIX, 'count');
     count.setAttribute('aria-live', 'polite');
 
-    const deleteBtn = document.createElement('button');
-    deleteBtn.setAttribute(PREFIX, 'delete');
-    deleteBtn.type = 'button';
-    deleteBtn.textContent = 'Delete selected';
+    const row = document.createElement('div');
+    row.setAttribute(PREFIX, 'toolbar-row');
+
+    const selectAll = makeButton('select-all', 'Select all');
+    const clear = makeButton('clear', 'Clear');
+
+    const deleteBtn = makeButton('delete', 'Delete selected');
 
     const status = document.createElement('div');
     status.setAttribute(PREFIX, 'status');
@@ -129,11 +132,12 @@
       void deleteSelected();
     });
 
-    row.append(selectAll, clear, count, deleteBtn);
-    toolbar.append(row, status);
+    head.append(title, count);
+    row.append(selectAll, clear);
+    toolbar.append(head, row, deleteBtn, status);
 
-    // Prepend so it stays visible at the top of the sidebar.
-    container.insertBefore(toolbar, container.firstChild);
+    // Fixed panel outside React's tree: always visible, never reconciled away.
+    document.body.appendChild(toolbar);
     updateToolbar();
   }
 
@@ -155,38 +159,90 @@
     const els = getToolbarElements();
     if (!els) return;
     const n = selected.size;
-    els.count.textContent = `${n} selected`;
+    els.count.textContent = n === 1 ? '1 selected' : `${n} selected`;
+    els.count.toggleAttribute(`${PREFIX}-active`, n > 0);
     els.deleteBtn.disabled = n === 0 || isDeleting;
     els.selectAll.disabled = isDeleting;
     els.clear.disabled = n === 0 || isDeleting;
-    els.deleteBtn.textContent = n === 0 ? 'Delete selected' : `Delete selected (${n})`;
+    els.deleteBtn.textContent = n === 0 ? 'Delete selected' : `Delete ${n} selected`;
   }
 
   // ---------------------------------------------------------------------------
-  // Checkboxes
+  // Checkboxes — custom, fully extension-controlled (no native <input>).
+  //
+  // Why: a native checkbox inside ChatGPT's row depends on the click event
+  // reaching it with default action intact. ChatGPT's own row-level handlers
+  // and hover re-renders can swallow or orphan that click, leaving the box
+  // unchecked. A custom button toggled from document-level capture handlers
+  // runs before any row handler and paints state itself, so it can't break.
   // ---------------------------------------------------------------------------
-  function syncCheckboxForItem(item, id) {
-    const input = item.querySelector(`[${PREFIX}="checkbox"]`);
-    if (!input) return;
-    const shouldCheck = selected.has(id);
-    if (input.checked !== shouldCheck) input.checked = shouldCheck;
-    input.setAttribute('aria-label', `Select conversation ${getConversationTitle(item)}`.trim());
-    if (shouldCheck) {
+  const CHECKBOX_SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function createCheckboxButton(id, title) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute(PREFIX, 'checkbox');
+    btn.setAttribute(ID_ATTR, id);
+    btn.setAttribute('role', 'checkbox');
+    btn.setAttribute('aria-checked', selected.has(id) ? 'true' : 'false');
+    btn.setAttribute('aria-label', `Select conversation ${title}`.trim());
+    btn.tabIndex = 0;
+
+    const svg = document.createElementNS(CHECKBOX_SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute(PREFIX, 'checkbox-icon');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+
+    const path = document.createElementNS(CHECKBOX_SVG_NS, 'path');
+    path.setAttribute('d', 'M3.2 8.6l3.3 3.3 6.3-7.8');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '2.4');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(path);
+    btn.appendChild(svg);
+    return btn;
+  }
+
+  function paintRow(item, id, checked) {
+    const btn = item.querySelector(`[${PREFIX}="checkbox"]`);
+    if (btn) {
+      btn.setAttribute('aria-checked', checked ? 'true' : 'false');
+      btn.setAttribute(ID_ATTR, id);
+      btn.setAttribute('aria-label', `Select conversation ${getConversationTitle(item)}`.trim());
+    }
+    const wrapper = item.querySelector(`[${PREFIX}="checkbox-wrapper"]`);
+    if (wrapper) wrapper.setAttribute(ID_ATTR, id);
+    if (checked) {
       item.setAttribute(SELECTED_ATTR, 'true');
     } else {
       item.removeAttribute(SELECTED_ATTR);
     }
   }
 
-  function toggleSelection(id, checked) {
-    if (checked) {
-      selected.add(id);
-    } else {
+  function syncCheckboxForItem(item, id) {
+    paintRow(item, id, selected.has(id));
+  }
+
+  // Dedupe: pointerdown (primary path) and click (assistive-tech fallback)
+  // can both fire for one press — only honor the first per row per moment.
+  let lastToggle = { id: null, t: 0 };
+
+  function toggleSelection(id) {
+    if (isDeleting) return;
+    const now = Date.now();
+    if (lastToggle.id === id && now - lastToggle.t < 600) return;
+    lastToggle = { id, t: now };
+
+    if (selected.has(id)) {
       selected.delete(id);
+    } else {
+      selected.add(id);
     }
-    // Sync highlight on every row with this id (normally one).
-    for (const item of findConversations()) {
-      if (getConversationId(item) === id) syncCheckboxForItem(item, id);
+    for (const item of findItemForId(id)) {
+      paintRow(item, id, selected.has(id));
     }
     updateToolbar();
   }
@@ -195,64 +251,22 @@
     const id = getConversationId(item);
     if (!id) return;
 
-    const existing = item.querySelector(`[${PREFIX}="checkbox-wrapper"]`);
-    if (existing) {
-      // Keep the wrapper's id in sync in case the row was recycled.
-      existing.setAttribute(`${PREFIX}-id`, id);
-      const input = existing.querySelector(`[${PREFIX}="checkbox"]`);
-      if (input) input.setAttribute(`${PREFIX}-id`, id);
+    let wrapper = item.querySelector(`[${PREFIX}="checkbox-wrapper"]`);
+    if (wrapper) {
+      // Row may have been recycled for another conversation (virtualized
+      // list) — refresh the id and repaint from the Set.
       syncCheckboxForItem(item, id);
       return;
     }
 
-    const wrapper = document.createElement('span');
+    wrapper = document.createElement('span');
     wrapper.setAttribute(PREFIX, 'checkbox-wrapper');
-    wrapper.setAttribute(`${PREFIX}-id`, id);
+    wrapper.setAttribute(ID_ATTR, id);
     wrapper.title = 'Select conversation';
-    wrapper.draggable = false;
-
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.setAttribute(PREFIX, 'checkbox');
-    input.setAttribute(`${PREFIX}-id`, id);
-    input.checked = selected.has(id);
-    input.tabIndex = 0;
-    input.setAttribute('aria-label', `Select conversation ${getConversationTitle(item)}`.trim());
-
-    // Clicking the checkbox must only toggle selection — never navigate,
-    // drag, pin, or open the three-dot menu.
-    const toggleFromEvent = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (isDeleting) return;
-      input.checked = !input.checked;
-      toggleSelection(id, input.checked);
-    };
-
-    wrapper.addEventListener('click', toggleFromEvent, true);
-    wrapper.addEventListener('mousedown', (e) => e.stopPropagation(), true);
-    wrapper.addEventListener('pointerdown', (e) => e.stopPropagation(), true);
-    wrapper.addEventListener('dragstart', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    }, true);
-    input.addEventListener('keydown', (e) => {
-      if (e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        e.stopPropagation();
-        if (isDeleting) return;
-        input.checked = !input.checked;
-        toggleSelection(id, input.checked);
-      } else {
-        e.stopPropagation();
-      }
-    });
-    // Change events (e.g. keyboard AT) funnel through the same path.
-    input.addEventListener('click', (e) => e.stopPropagation());
-
-    wrapper.appendChild(input);
+    // No per-node listeners: toggling is handled by document-level capture
+    // handlers so ChatGPT row handlers can never swallow the event.
+    wrapper.appendChild(createCheckboxButton(id, getConversationTitle(item)));
     item.insertBefore(wrapper, item.firstChild);
-
     if (selected.has(id)) {
       item.setAttribute(SELECTED_ATTR, 'true');
     }
@@ -268,6 +282,64 @@
     for (const item of findConversations()) {
       const id = getConversationId(item);
       if (id) syncCheckboxForItem(item, id);
+    }
+  }
+
+  function wrapperIdFromEventTarget(target) {
+    if (!(target instanceof Element)) return null;
+    const wrapper = target.closest(`[${PREFIX}="checkbox-wrapper"]`);
+    if (!wrapper) return null;
+    return wrapper.getAttribute(ID_ATTR) || null;
+  }
+
+  // Primary path: pointerdown fires before any hover re-render can replace
+  // the node and before ChatGPT's own handlers run (document capture).
+  // preventDefault() here suppresses the compatibility click, so no anchor
+  // navigation and no double toggle.
+  function onPointerDownCapture(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    if (e.isPrimary === false) return;
+    const id = wrapperIdFromEventTarget(e.target);
+    if (!id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    toggleSelection(id);
+  }
+
+  // Fallback path: keyboard/screen-reader activation synthesizes click
+  // without pointerdown. Suppressed after a pointerdown toggle by dedupe.
+  function onClickCapture(e) {
+    const id = wrapperIdFromEventTarget(e.target);
+    if (!id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    toggleSelection(id);
+  }
+
+  function onKeyCapture(e) {
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    if (target.getAttribute(PREFIX) !== 'checkbox') return;
+    if (e.key === ' ' || e.key === 'Enter') {
+      // Keydown Enter activates buttons; Space activates on keyup — cancel
+      // both so the anchor never receives an activating click.
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.type === 'keydown') {
+        const wrapper = target.closest(`[${PREFIX}="checkbox-wrapper"]`);
+        const id = wrapper?.getAttribute(ID_ATTR);
+        if (id) toggleSelection(id);
+      }
+    }
+  }
+
+  function onMouseDownOrDragCapture(e) {
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    // Never let ChatGPT start a drag from the checkbox; keep focus/click
+    // behavior intact (no preventDefault here).
+    if (target.closest(`[${PREFIX}="checkbox-wrapper"]`)) {
+      e.stopPropagation();
     }
   }
 
@@ -306,13 +378,18 @@
       dialog.setAttribute('aria-modal', 'true');
       dialog.setAttribute('aria-label', 'Confirm deletion');
 
+      const icon = document.createElement('div');
+      icon.setAttribute(PREFIX, 'dialog-icon');
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = '!';
+
       const title = document.createElement('h2');
       title.setAttribute(PREFIX, 'dialog-title');
       title.textContent = `Delete ${count} conversation${count === 1 ? '' : 's'}?`;
 
       const body = document.createElement('p');
       body.setAttribute(PREFIX, 'dialog-body');
-      body.textContent = 'This cannot be undone.';
+      body.textContent = 'This cannot be undone. Deleted conversations cannot be recovered.';
 
       const actions = document.createElement('div');
       actions.setAttribute(PREFIX, 'dialog-actions');
@@ -325,7 +402,7 @@
       const confirm = document.createElement('button');
       confirm.setAttribute(PREFIX, 'dialog-confirm');
       confirm.type = 'button';
-      confirm.textContent = 'Delete';
+      confirm.textContent = count === 1 ? 'Delete' : `Delete ${count}`;
 
       let settled = false;
       const done = (value) => {
@@ -356,7 +433,7 @@
       document.addEventListener('keydown', onKey, true);
 
       actions.append(cancel, confirm);
-      dialog.append(title, body, actions);
+      dialog.append(icon, title, body, actions);
       overlay.appendChild(dialog);
       document.body.appendChild(overlay);
       cancel.focus();
@@ -397,10 +474,8 @@
   }
 
   function removeConversationFromSidebar(id) {
-    for (const item of findConversations()) {
-      if (getConversationId(item) === id) {
-        item.remove();
-      }
+    for (const item of findItemForId(id)) {
+      item.remove();
     }
   }
 
@@ -453,25 +528,23 @@
     syncAllCheckboxes();
     updateToolbar();
 
+    let message;
+    let mode;
     if (failed === 0) {
-      setStatus(
-        total === 1 ? 'Deleted 1 conversation.' : `Deleted ${succeeded} conversations.`,
-        'success'
-      );
+      message = total === 1 ? 'Deleted 1 conversation.' : `Deleted ${succeeded} conversations.`;
+      mode = 'success';
     } else if (succeeded === 0) {
-      setStatus(
-        failed === 1
-          ? 'Could not delete 1 conversation.'
-          : `Deleted 0 of ${total} conversations. ${failed} conversations could not be deleted.`,
-        'error'
-      );
+      message = failed === 1
+        ? 'Could not delete 1 conversation.'
+        : `Deleted 0 of ${total} conversations. ${failed} conversations could not be deleted.`;
+      mode = 'error';
     } else {
-      setStatus(
-        `Deleted ${succeeded} of ${total} conversations. ` +
-          `${failed} conversation${failed === 1 ? '' : 's'} could not be deleted.`,
-        'error'
-      );
+      message = `Deleted ${succeeded} of ${total} conversations. ` +
+        `${failed} conversation${failed === 1 ? '' : 's'} could not be deleted.`;
+      mode = 'error';
     }
+    setStatus(message, mode);
+    console.info('[ChatGPT Mass Delete] %s', message);
     updateToolbar();
   }
 
@@ -500,60 +573,69 @@
     }
   }
 
-  function isExtensionNode(node) {
-    return (
-      node instanceof Element &&
-      (node.hasAttribute(PREFIX) || node.closest(`[${PREFIX}]`) !== null)
-    );
-  }
-
   const observer = new MutationObserver((mutations) => {
     // Ignore mutations caused by our own toolbar/modal/checkboxes.
     let relevant = false;
     for (const m of mutations) {
-      if (m.target instanceof Element && m.target.closest(`[${PREFIX}]`)) {
-        // The checkbox wrapper lives inside a sidebar item, so check whether
-        // the sidebar item itself was added/removed as well.
-        const addedItems = [];
-        const removedItems = [];
-        for (const n of m.addedNodes) {
-          if (n instanceof Element) {
-            if (n.matches?.(SIDEBAR_ITEM_SELECTOR)) addedItems.push(n);
-            else if (n.querySelector?.(SIDEBAR_ITEM_SELECTOR)) relevant = true;
-          }
-        }
-        for (const n of m.removedNodes) {
-          if (n instanceof Element) {
-            if (n.matches?.(SIDEBAR_ITEM_SELECTOR)) removedItems.push(n);
-            else if (n.querySelector?.(SIDEBAR_ITEM_SELECTOR)) relevant = true;
-          }
-        }
-        if (addedItems.length > 0 || removedItems.length > 0) relevant = true;
-        continue;
-      }
-      relevant = true;
-      // Quick check: does this mutation touch sidebar items?
-      for (const n of m.addedNodes) {
-        if (n instanceof Element) {
-          if (isExtensionNode(n)) continue;
+      if (m.type === 'attributes') {
+        if (m.target instanceof Element && !m.target.closest(`[${PREFIX}]`)) {
           relevant = true;
           break;
         }
+        continue;
       }
-      if (relevant) break;
+      if (m.target instanceof Element && m.target.closest(`[${PREFIX}]`)) {
+        // The checkbox wrapper lives inside a sidebar item, so check whether
+        // the sidebar item itself was added/removed as well.
+        for (const n of m.addedNodes) {
+          if (n instanceof Element && (n.matches?.(SIDEBAR_ITEM_SELECTOR) || n.querySelector?.(SIDEBAR_ITEM_SELECTOR))) {
+            relevant = true;
+            break;
+          }
+        }
+        if (relevant) break;
+        for (const n of m.removedNodes) {
+          if (n instanceof Element && (n.matches?.(SIDEBAR_ITEM_SELECTOR) || n.querySelector?.(SIDEBAR_ITEM_SELECTOR))) {
+            relevant = true;
+            break;
+          }
+        }
+        if (relevant) break;
+        continue;
+      }
+      relevant = true;
+      break;
     }
     if (relevant) scheduleScan();
   });
 
   function boot() {
+    // Document-level capture first: our handlers run before any ChatGPT
+    // row-level handler, so selection can never be swallowed.
+    document.addEventListener('pointerdown', onPointerDownCapture, true);
+    document.addEventListener('click', onClickCapture, true);
+    document.addEventListener('keydown', onKeyCapture, true);
+    document.addEventListener('keyup', onKeyCapture, true);
+    document.addEventListener('mousedown', onMouseDownOrDragCapture, true);
+    document.addEventListener('dragstart', onMouseDownOrDragCapture, true);
+
     ensureToolbar();
     ensureAllCheckboxes();
     updateToolbar();
 
+    // href/aria-label cover in-place row recycling (virtualized lists);
+    // childList covers added/removed conversations.
     observer.observe(document.documentElement, {
       childList: true,
       subtree: true,
+      attributes: true,
+      attributeFilter: ['href', 'aria-label'],
     });
+
+    console.info(
+      '[ChatGPT Mass Delete] active — %d conversations detected',
+      findConversations().length
+    );
 
     // Catch late sidebar renders (cold load, SPA nav).
     for (const delay of [500, 1500, 3000, 6000]) {
