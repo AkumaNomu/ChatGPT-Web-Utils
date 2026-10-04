@@ -2,122 +2,97 @@
    Every selector is scoped to [data-chatgpt-mass-delete] so ChatGPT's
    React app never accidentally matches extension elements. */
 
-/* ---------- Toolbar: floating bar pinned to the top-center ---------- */
+[data-chatgpt-mass-delete="toolbar"],
+[data-chatgpt-mass-delete="dialog"] {
+  font-family: Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* ---------- Toolbar: docked card above the chat list in the sidebar ---------- */
 [data-chatgpt-mass-delete="toolbar"] {
-  position: fixed;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 360px;
-  max-width: calc(100vw - 24px);
-  z-index: 2147483646;
-  background: #ffffff;
-  color: #0d0d0d;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  padding: 12px;
+  position: sticky;
+  top: 8px;
+  z-index: 30;
+  margin: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(33, 33, 33, 0.85);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  color: #ececec;
   font-size: 13px;
   line-height: 1.4;
-  font-family: inherit;
 }
 
-[data-chatgpt-mass-delete="toolbar-head"] {
+[data-chatgpt-mass-delete="toolbar-row"] {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-[data-chatgpt-mass-delete="toolbar-title"] {
-  font-weight: 600;
-  font-size: 13px;
+  gap: 6px;
 }
 
 [data-chatgpt-mass-delete="count"] {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.06);
-  color: inherit;
-  opacity: 0.85;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ececec;
   white-space: nowrap;
-}
-
-[data-chatgpt-mass-delete="count"][data-chatgpt-mass-delete-active] {
-  background: rgba(16, 163, 127, 0.16);
-  color: #0b7a5c;
-  font-weight: 600;
-  opacity: 1;
-}
-
-[data-chatgpt-mass-delete="toolbar-row"] {
-  display: flex;
-  gap: 8px;
-}
-
-[data-chatgpt-mass-delete="toolbar-row"] button {
-  flex: 1 1 0;
-  padding: 7px 6px;
 }
 
 [data-chatgpt-mass-delete="toolbar"] button {
   appearance: none;
-  border: 1px solid rgba(0, 0, 0, 0.14);
-  border-radius: 9px;
-  background: #f4f4f4;
-  color: inherit;
-  font-size: 12.5px;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  background: transparent;
+  color: #ececec;
+  font-size: 13px;
   font-weight: 500;
   font-family: inherit;
-  padding: 7px 10px;
+  padding: 6px 12px;
   cursor: pointer;
   white-space: nowrap;
 }
 
-[data-chatgpt-mass-delete="toolbar"] button:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.07);
+[data-chatgpt-mass-delete="select-all"]:hover:not(:disabled),
+[data-chatgpt-mass-delete="clear"]:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 [data-chatgpt-mass-delete="toolbar"] button:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: default;
 }
 
 [data-chatgpt-mass-delete="delete"] {
-  flex: 1.4 1 0;
-  border-color: #dc2626 !important;
-  background: #dc2626 !important;
+  margin-left: auto;
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
   color: #ffffff !important;
   font-weight: 600 !important;
 }
 
 [data-chatgpt-mass-delete="delete"]:hover:not(:disabled) {
-  background: #b91c1c !important;
-  border-color: #b91c1c !important;
+  background: #dc2626 !important;
+  border-color: #dc2626 !important;
 }
 
 [data-chatgpt-mass-delete="status"] {
   margin-top: 8px;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  opacity: 0.9;
+  color: #b4b4b4;
 }
 
 [data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="success"] {
-  color: #15803d;
+  color: #ececec;
   font-weight: 500;
 }
 
 [data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="error"] {
-  color: #b91c1c;
+  color: #f87171;
   font-weight: 500;
-}
-
-[data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="progress"] {
-  opacity: 0.75;
 }
 
 /* ---------- Custom checkbox injected into each conversation row ---------- */
@@ -129,14 +104,23 @@
   align-self: center;
   justify-content: center;
   flex: 0 0 auto;
-  margin-right: 6px;
-  padding: 5px;
-  border-radius: 8px;
+  margin-right: 2px;
+  padding: 4px;
+  border-radius: 6px;
   cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+
+[data-sidebar-item="true"]:hover [data-chatgpt-mass-delete="checkbox-wrapper"],
+[data-chatgpt-mass-delete="checkbox-wrapper"]:hover,
+[data-chatgpt-mass-delete="checkbox-wrapper"]:focus-within,
+[data-chatgpt-mass-delete="checkbox-wrapper"][data-chatgpt-mass-delete-checked] {
+  opacity: 1;
 }
 
 [data-chatgpt-mass-delete="checkbox-wrapper"]:hover {
-  background: rgba(0, 0, 0, 0.07);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 [data-chatgpt-mass-delete="checkbox"] {
@@ -144,37 +128,37 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   margin: 0;
   padding: 0;
   flex: 0 0 auto;
-  border: 2px solid rgba(110, 110, 110, 0.7);
-  border-radius: 6px;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
   background: transparent;
   color: inherit;
   cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
 
 [data-chatgpt-mass-delete="checkbox"]:hover {
-  border-color: #10a37f;
-  box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.18);
+  border-color: rgba(255, 255, 255, 0.6);
 }
 
 [data-chatgpt-mass-delete="checkbox"]:focus-visible {
-  outline: 2px solid #10a37f;
+  outline: 2px solid rgba(255, 255, 255, 0.7);
   outline-offset: 2px;
 }
 
 [data-chatgpt-mass-delete="checkbox"][aria-checked="true"] {
-  background: #10a37f;
-  border-color: #10a37f;
-  color: #ffffff;
+  background: #ececec;
+  border-color: #ececec;
+  color: #171717;
 }
 
 [data-chatgpt-mass-delete="checkbox-icon"] {
-  width: 13px;
-  height: 13px;
+  width: 11px;
+  height: 11px;
   opacity: 0;
   transform: scale(0.4);
   transition: opacity 0.12s ease, transform 0.12s ease;
@@ -187,8 +171,7 @@
 
 /* Selected-row highlight (attribute lives on the sidebar item itself). */
 [data-sidebar-item="true"][data-chatgpt-mass-delete-selected="true"] {
-  background: rgba(16, 163, 127, 0.14) !important;
-  box-shadow: inset 3px 0 0 #10a37f;
+  background: rgba(255, 255, 255, 0.07) !important;
 }
 
 /* ---------- Confirmation dialog ---------- */
@@ -206,13 +189,14 @@
 [data-chatgpt-mass-delete="dialog"] {
   width: min(420px, 100%);
   border-radius: 14px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  background: #ffffff;
-  color: #0d0d0d;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(33, 33, 33, 0.95);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: #ececec;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
   padding: 22px;
   font-size: 14px;
-  font-family: inherit;
   text-align: center;
   animation: cmd-pop 0.14s ease-out;
 }
@@ -233,8 +217,8 @@
   height: 44px;
   margin: 0 auto 12px auto;
   border-radius: 50%;
-  background: rgba(220, 38, 38, 0.12);
-  color: #dc2626;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
   font-size: 24px;
   font-weight: 700;
   line-height: 44px;
@@ -244,11 +228,12 @@
   margin: 0 0 8px 0;
   font-size: 17px;
   font-weight: 600;
+  color: #ececec;
 }
 
 [data-chatgpt-mass-delete="dialog-body"] {
   margin: 0 0 18px 0;
-  opacity: 0.75;
+  color: #b4b4b4;
   font-size: 13.5px;
 }
 
@@ -261,7 +246,7 @@
 [data-chatgpt-mass-delete="dialog-actions"] button {
   appearance: none;
   flex: 1 1 0;
-  border-radius: 9px;
+  border-radius: 9999px;
   font-size: 14px;
   font-weight: 600;
   font-family: inherit;
@@ -270,98 +255,108 @@
 }
 
 [data-chatgpt-mass-delete="dialog-cancel"] {
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  background: transparent;
-  color: inherit;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ececec;
 }
 
 [data-chatgpt-mass-delete="dialog-cancel"]:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 [data-chatgpt-mass-delete="dialog-confirm"] {
-  border: 1px solid #dc2626;
-  background: #dc2626;
+  border: 1px solid #ef4444;
+  background: #ef4444;
   color: #ffffff;
 }
 
 [data-chatgpt-mass-delete="dialog-confirm"]:hover {
-  background: #b91c1c;
+  background: #dc2626;
 }
 
-/* ---------- Dark mode (ChatGPT uses .dark on <html>; also honor OS) ---------- */
-html.dark [data-chatgpt-mass-delete="toolbar"],
-.dark [data-chatgpt-mass-delete="toolbar"] {
-  background: #212121;
-  border-color: rgba(255, 255, 255, 0.14);
-  color: #ececec;
+/* ---------- Light mode ---------- */
+html.light [data-chatgpt-mass-delete="toolbar"],
+html:not(.dark) [data-chatgpt-mass-delete="toolbar"] {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #0d0d0d;
 }
 
-html.dark [data-chatgpt-mass-delete="count"],
-.dark [data-chatgpt-mass-delete="count"] {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-html.dark [data-chatgpt-mass-delete="count"][data-chatgpt-mass-delete-active],
-.dark [data-chatgpt-mass-delete="count"][data-chatgpt-mass-delete-active] {
-  background: rgba(16, 163, 127, 0.25);
-  color: #4ade80;
-}
-
-html.dark [data-chatgpt-mass-delete="toolbar"] button,
-.dark [data-chatgpt-mass-delete="toolbar"] button {
-  background: #2f2f2f;
-  border-color: rgba(255, 255, 255, 0.14);
-  color: #ececec;
-}
-
-html.dark [data-chatgpt-mass-delete="toolbar"] button:hover:not(:disabled),
-.dark [data-chatgpt-mass-delete="toolbar"] button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-html.dark [data-chatgpt-mass-delete="checkbox-wrapper"]:hover,
-.dark [data-chatgpt-mass-delete="checkbox-wrapper"]:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-html.dark [data-chatgpt-mass-delete="checkbox"],
-.dark [data-chatgpt-mass-delete="checkbox"] {
-  border-color: rgba(200, 200, 200, 0.6);
-}
-
-html.dark [data-chatgpt-mass-delete="dialog"],
-.dark [data-chatgpt-mass-delete="dialog"] {
-  background: #212121;
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #ececec;
-}
-
-html.dark [data-chatgpt-mass-delete="dialog-cancel"]:hover,
-.dark [data-chatgpt-mass-delete="dialog-cancel"]:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-html.dark [data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="success"],
-.dark [data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="success"] {
-  color: #4ade80;
-}
-
-html.dark [data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="error"],
-.dark [data-chatgpt-mass-delete="status"][data-chatgpt-mass-delete-status-mode="error"] {
-  color: #f87171;
-}
-
-@media (prefers-color-scheme: dark) {
-  html:not(.light) [data-chatgpt-mass-delete="toolbar"] {
-    background: #212121;
-    border-color: rgba(255, 255, 255, 0.14);
-    color: #ececec;
+@media (prefers-color-scheme: light) {
+  html:not(.dark) [data-chatgpt-mass-delete="toolbar"] {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(0, 0, 0, 0.1);
+    color: #0d0d0d;
   }
+}
 
-  html:not(.light) [data-chatgpt-mass-delete="dialog"] {
-    background: #212121;
-    border-color: rgba(255, 255, 255, 0.12);
-    color: #ececec;
-  }
+html.light [data-chatgpt-mass-delete="count"],
+html:not(.dark) [data-chatgpt-mass-delete="count"] {
+  background: rgba(0, 0, 0, 0.06);
+  color: #0d0d0d;
+}
+
+html.light [data-chatgpt-mass-delete="toolbar"] button,
+html:not(.dark) [data-chatgpt-mass-delete="toolbar"] button {
+  color: #0d0d0d;
+}
+
+html.light [data-chatgpt-mass-delete="select-all"]:hover:not(:disabled),
+html.light [data-chatgpt-mass-delete="clear"]:hover:not(:disabled),
+html:not(.dark) [data-chatgpt-mass-delete="select-all"]:hover:not(:disabled),
+html:not(.dark) [data-chatgpt-mass-delete="clear"]:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+html.light [data-chatgpt-mass-delete="status"],
+html:not(.dark) [data-chatgpt-mass-delete="status"] {
+  color: #6e6e6e;
+}
+
+html.light [data-chatgpt-mass-delete="checkbox"],
+html:not(.dark) [data-chatgpt-mass-delete="checkbox"] {
+  border-color: rgba(0, 0, 0, 0.3);
+}
+
+html.light [data-chatgpt-mass-delete="checkbox"]:hover,
+html:not(.dark) [data-chatgpt-mass-delete="checkbox"]:hover {
+  border-color: rgba(0, 0, 0, 0.6);
+}
+
+html.light [data-chatgpt-mass-delete="checkbox-wrapper"]:hover,
+html:not(.dark) [data-chatgpt-mass-delete="checkbox-wrapper"]:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+html.light [data-sidebar-item="true"][data-chatgpt-mass-delete-selected="true"],
+html:not(.dark) [data-sidebar-item="true"][data-chatgpt-mass-delete-selected="true"] {
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light [data-chatgpt-mass-delete="dialog"],
+html:not(.dark) [data-chatgpt-mass-delete="dialog"] {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #0d0d0d;
+}
+
+html.light [data-chatgpt-mass-delete="dialog-title"],
+html:not(.dark) [data-chatgpt-mass-delete="dialog-title"] {
+  color: #0d0d0d;
+}
+
+html.light [data-chatgpt-mass-delete="dialog-body"],
+html:not(.dark) [data-chatgpt-mass-delete="dialog-body"] {
+  color: #6e6e6e;
+}
+
+html.light [data-chatgpt-mass-delete="dialog-cancel"],
+html:not(.dark) [data-chatgpt-mass-delete="dialog-cancel"] {
+  background: rgba(0, 0, 0, 0.05);
+  color: #0d0d0d;
+}
+
+html.light [data-chatgpt-mass-delete="dialog-cancel"]:hover,
+html:not(.dark) [data-chatgpt-mass-delete="dialog-cancel"]:hover {
+  background: rgba(0, 0, 0, 0.08);
 }

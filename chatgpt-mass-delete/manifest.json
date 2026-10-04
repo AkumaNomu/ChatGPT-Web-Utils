@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "ChatGPT Mass Delete",
-  "version": "1.0.6",
+  "version": "1.1.0",
   "description": "Select multiple ChatGPT sidebar conversations and delete them all at once.",
   "browser_specific_settings": {
     "gecko": {
@@ -11,9 +11,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*"],
-      "js": ["content.js"],
-      "css": ["styles.css"],
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     }

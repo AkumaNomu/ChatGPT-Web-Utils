@@ -90,34 +90,6 @@
     };
   }
 
-  function isDarkTheme() {
-    return (
-      document.documentElement.classList.contains('dark') ||
-      document.body?.classList.contains('dark') === true
-    );
-  }
-
-  // Inline critical styles: the manifest stylesheet is the primary path,
-  // but these guarantee the panel is visible even if it fails to apply.
-  function styleToolbarInline(toolbar) {
-    const dark = isDarkTheme();
-    toolbar.style.position = 'fixed';
-    toolbar.style.top = '12px';
-    toolbar.style.left = '50%';
-    toolbar.style.transform = 'translateX(-50%)';
-    toolbar.style.zIndex = '2147483646';
-    toolbar.style.width = '360px';
-    toolbar.style.maxWidth = 'calc(100vw - 24px)';
-    toolbar.style.background = dark ? '#212121' : '#ffffff';
-    toolbar.style.color = dark ? '#ececec' : '#0d0d0d';
-    toolbar.style.border = '1px solid rgba(128, 128, 128, 0.4)';
-    toolbar.style.borderRadius = '14px';
-    toolbar.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.25)';
-    toolbar.style.padding = '12px';
-    toolbar.style.fontSize = '13px';
-    toolbar.style.lineHeight = '1.4';
-  }
-
   function makeButton(kind, label) {
     const btn = document.createElement('button');
     btn.setAttribute(PREFIX, kind);
@@ -131,31 +103,21 @@
       updateToolbar();
       return;
     }
-    if (!document.body) {
-      setTimeout(scheduleScan, 300);
-      return;
-    }
+    const container = findSidebarContainer();
+    if (!container) return; // Retried by scheduleScan once chats render.
 
     const toolbar = document.createElement('div');
     toolbar.setAttribute(PREFIX, 'toolbar');
 
-    const head = document.createElement('div');
-    head.setAttribute(PREFIX, 'toolbar-head');
-
-    const title = document.createElement('span');
-    title.setAttribute(PREFIX, 'toolbar-title');
-    title.textContent = 'Mass delete';
+    const row = document.createElement('div');
+    row.setAttribute(PREFIX, 'toolbar-row');
 
     const count = document.createElement('span');
     count.setAttribute(PREFIX, 'count');
     count.setAttribute('aria-live', 'polite');
 
-    const row = document.createElement('div');
-    row.setAttribute(PREFIX, 'toolbar-row');
-
     const selectAll = makeButton('select-all', 'Select all');
     const clear = makeButton('clear', 'Clear');
-
     const deleteBtn = makeButton('delete', 'Delete selected');
 
     const status = document.createElement('div');
@@ -176,14 +138,11 @@
       void deleteSelected();
     });
 
-    head.append(title, count);
-    row.append(selectAll, clear, deleteBtn);
-    toolbar.append(head, row, status);
-    styleToolbarInline(toolbar);
+    row.append(count, selectAll, clear, deleteBtn);
+    toolbar.append(row, status);
 
-    // Top-center panel outside React's tree: always visible, never
-    // reconciled away.
-    document.body.appendChild(toolbar);
+    // Docked above the chat list: first child of the sidebar container.
+    container.insertBefore(toolbar, container.firstChild);
     updateToolbar();
     console.info(
       '[ChatGPT Mass Delete] toolbar mounted (%d conversations detected)',
@@ -210,11 +169,10 @@
     if (!els) return;
     const n = selected.size;
     els.count.textContent = n === 1 ? '1 selected' : `${n} selected`;
-    els.count.toggleAttribute(`${PREFIX}-active`, n > 0);
     els.deleteBtn.disabled = n === 0 || isDeleting;
     els.selectAll.disabled = isDeleting;
     els.clear.disabled = n === 0 || isDeleting;
-    els.deleteBtn.textContent = n === 0 ? 'Delete selected' : `Delete ${n} selected`;
+    els.deleteBtn.textContent = n === 0 ? 'Delete' : `Delete (${n})`;
   }
 
   // ---------------------------------------------------------------------------
@@ -238,19 +196,20 @@
     btn.setAttribute('aria-label', `Select conversation ${title}`.trim());
     btn.tabIndex = 0;
     // Inline base styles so the box renders even without the stylesheet.
-    btn.style.width = '20px';
-    btn.style.height = '20px';
+    // Checked = solid light fill with dark check (ChatGPT dark convention).
+    btn.style.width = '16px';
+    btn.style.height = '16px';
     btn.style.display = 'inline-flex';
     btn.style.alignItems = 'center';
     btn.style.justifyContent = 'center';
     btn.style.margin = '0';
     btn.style.padding = '0';
     btn.style.flex = '0 0 auto';
-    btn.style.border = '2px solid #888';
-    btn.style.borderRadius = '6px';
-    btn.style.background = selected.has(id) ? '#10a37f' : 'transparent';
-    btn.style.borderColor = selected.has(id) ? '#10a37f' : '';
-    btn.style.color = selected.has(id) ? '#ffffff' : '';
+    btn.style.border = '1.5px solid #888';
+    btn.style.borderRadius = '4px';
+    btn.style.background = selected.has(id) ? '#ececec' : 'transparent';
+    btn.style.borderColor = selected.has(id) ? '#ececec' : '';
+    btn.style.color = selected.has(id) ? '#171717' : '';
     btn.style.cursor = 'pointer';
 
     const svg = document.createElementNS(CHECKBOX_SVG_NS, 'svg');
@@ -258,8 +217,8 @@
     svg.setAttribute(PREFIX, 'checkbox-icon');
     svg.setAttribute('aria-hidden', 'true');
     svg.setAttribute('focusable', 'false');
-    svg.style.width = '13px';
-    svg.style.height = '13px';
+    svg.style.width = '11px';
+    svg.style.height = '11px';
     svg.style.opacity = selected.has(id) ? '1' : '0';
 
     const path = document.createElementNS(CHECKBOX_SVG_NS, 'path');
@@ -281,10 +240,10 @@
       btn.setAttribute(ID_ATTR, id);
       btn.setAttribute('aria-label', `Select conversation ${getConversationTitle(item)}`.trim());
       // Inline checked visuals (stylesheet enhances with transitions/themes).
-      btn.style.background = checked ? '#10a37f' : 'transparent';
+      btn.style.background = checked ? '#ececec' : 'transparent';
       if (checked) {
-        btn.style.borderColor = '#10a37f';
-        btn.style.color = '#ffffff';
+        btn.style.borderColor = '#ececec';
+        btn.style.color = '#171717';
       } else {
         btn.style.borderColor = '';
         btn.style.color = '';
@@ -293,7 +252,15 @@
       if (icon instanceof Element) icon.style.opacity = checked ? '1' : '0';
     }
     const wrapper = item.querySelector(`[${PREFIX}="checkbox-wrapper"]`);
-    if (wrapper) wrapper.setAttribute(ID_ATTR, id);
+    if (wrapper) {
+      wrapper.setAttribute(ID_ATTR, id);
+      // Drives the full-opacity reveal for checked rows (stylesheet).
+      if (checked) {
+        wrapper.setAttribute(`${PREFIX}-checked`, 'true');
+      } else {
+        wrapper.removeAttribute(`${PREFIX}-checked`);
+      }
+    }
     if (checked) {
       item.setAttribute(SELECTED_ATTR, 'true');
     } else {
@@ -347,12 +314,15 @@
     wrapper.style.justifyContent = 'center';
     wrapper.style.alignSelf = 'center';
     wrapper.style.flex = '0 0 auto';
+    wrapper.style.flexShrink = '0';
     wrapper.style.position = 'relative';
     wrapper.style.zIndex = '1';
-    wrapper.style.marginRight = '6px';
-    wrapper.style.padding = '5px';
-    wrapper.style.borderRadius = '8px';
+    wrapper.style.marginRight = '2px';
+    wrapper.style.padding = '4px';
+    wrapper.style.borderRadius = '6px';
     wrapper.style.cursor = 'pointer';
+    // NOTE: opacity is intentionally NOT inlined — the stylesheet dims
+    // idle checkboxes and reveals them on row hover/selection.
     // No per-node listeners: toggling is handled by document-level capture
     // handlers so ChatGPT row handlers can never swallow the event.
     wrapper.appendChild(createCheckboxButton(id, getConversationTitle(item)));
