@@ -61,10 +61,22 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Toolbar — fixed panel docked at the sidebar's bottom-left, appended to
-  // <body> OUTSIDE ChatGPT's React tree so rerenders can never remove,
-  // relocate, or hide it.
+  // Toolbar — docked above the chat list inside the sidebar (first child of
+  // the nav/aside holding the conversations), so it stays attached to the
+  // list it controls. The MutationObserver re-creates it if a rerender
+  // drops it.
   // ---------------------------------------------------------------------------
+  function findSidebarContainer() {
+    const items = findConversations();
+    if (items.length === 0) return null;
+    const first = items[0];
+    return (
+      first.closest('nav') ||
+      first.closest('aside') ||
+      first.parentElement
+    );
+  }
+
   function getToolbarElements() {
     const toolbar = document.querySelector(`[${PREFIX}="toolbar"]`);
     if (!toolbar) return null;
