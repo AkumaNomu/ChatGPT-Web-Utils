@@ -128,6 +128,8 @@
       updateToolbar();
       return;
     }
+    // Never insert during churn/hydration — the interval retries once calm.
+    if (!sidebarQuiet) return;
     const anchor = findToolbarAnchor();
     if (!anchor) return; // Retried by scans + interval once chats render.
 
@@ -873,14 +875,31 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Hydration-safe boot. ChatGPT server-renders the sidebar and React
-  // hydrates it after load: any foreign node inserted into that tree
-  // beforehand causes a hydration mismatch (React error #418) and React
-  // discards our nodes. So injection waits until the sidebar stops
-  // churning (quiet period) or a cap expires — whichever comes first.
-  // Later client-side rerenders merely drop our nodes (no crash) and the
-  // observer + interval below re-add them.
+  // Hydration-safe mounting. ChatGPT server-renders the sidebar and React
+  // hydrates it after load — and a quiet sidebar is NOT proof hydration
+  // ran (it can hydrate lazily after seconds of calm). Any foreign node
+  // inserted beforehand causes a hydration mismatch (React error #418)
+  // and React discards our nodes. So structural insertion requires ALL of:
+  //   1. the sidebar subtree calm for QUIET_MS (churn/hydration detector),
+  //   2. document fully loaded plus a tail delay (hydration virtually
+  //      always done by then),
+  //   3. a minimum page age (kills the quiet-but-not-yet-hydrated race).
+  // The same gate protects every re-insertion, not just boot. Later
+  // client-side rerenders merely drop our nodes (no crash) and the
+  // observer + interval re-add them once calm returns. Absolute cap
+  // forces progress so the UI can never stay invisible forever.
   // ---------------------------------------------------------------------------
+  const QUIET_MS = 1500;
+  const TAIL_AFTER_LOAD_MS = 2500;
+  const MIN_PAGE_AGE_MS = 4000;
+  const MOUNT_CAP_MS = 25000;
+
+  const bootTime = Date.now();
+  let quietWatchedRoot = null;
+  let sidebarQuiet = false;
+  let quietTimer = null;
+  let quietForced = false;
+
   function findSidebarRoot() {
     const items = findConversations();
     if (items.length > 0) {
@@ -889,44 +908,76 @@
     return document.querySelector('nav') || document.querySelector('aside');
   }
 
-  function waitForSidebarSettled({ quietMs = 1200, capMs = 10000, pollMs = 300 } = {}) {
+  function markSidebarBusy() {
+    sidebarQuiet = false;
+    clearTimeout(quietTimer);
+    quietTimer = setTimeout(() => {
+      sidebarQuiet = true;
+    }, QUIET_MS);
+  }
+
+  const quietObserver = new MutationObserver(() => {
+    markSidebarBusy();
+  });
+
+  // Re-anchor the churn watcher when React swaps the sidebar subtree
+  // (otherwise we'd watch a detached node and stall forever).
+  function ensureQuietWatcher() {
+    try {
+      const root = findSidebarRoot();
+      if (!root) return false;
+      if (root !== quietWatchedRoot) {
+        quietObserver.disconnect();
+        quietWatchedRoot = root;
+        quietObserver.observe(root, { childList: true, subtree: true });
+        markSidebarBusy();
+      }
+      if (!quietForced && Date.now() - bootTime > MOUNT_CAP_MS) {
+        quietForced = true;
+        sidebarQuiet = true;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function mountWindowOpen() {
+    if (quietForced) return true;
+    if (!sidebarQuiet) return false;
+    if (document.readyState !== 'complete') return false;
+    if (Date.now() - bootTime < MIN_PAGE_AGE_MS) return false;
+    if (!loadPlusTailElapsed()) return false;
+    return true;
+  }
+
+  let loadTime = 0;
+  if (document.readyState === 'complete') {
+    loadTime = Date.now();
+  } else {
+    window.addEventListener(
+      'load',
+      () => {
+        loadTime = Date.now();
+      },
+      { once: true }
+    );
+  }
+
+  function loadPlusTailElapsed() {
+    return loadTime !== 0 && Date.now() - loadTime > TAIL_AFTER_LOAD_MS;
+  }
+
+  function waitForMountWindow() {
     return new Promise((resolve) => {
-      const start = Date.now();
-      let quietTimer = null;
-      let settled = false;
-      const obs = new MutationObserver(() => {
-        if (settled) return;
-        if (Date.now() - start > capMs) {
-          done();
-          return;
+      const tick = setInterval(() => {
+        ensureQuietWatcher();
+        if (mountWindowOpen() || Date.now() - bootTime > MOUNT_CAP_MS) {
+          clearInterval(tick);
+          sidebarQuiet = true;
+          resolve();
         }
-        clearTimeout(quietTimer);
-        quietTimer = setTimeout(done, quietMs);
-      });
-      const done = () => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(quietTimer);
-        clearInterval(poll);
-        obs.disconnect();
-        resolve();
-      };
-      const poll = setInterval(() => {
-        if (settled) {
-          clearInterval(poll);
-          return;
-        }
-        if (Date.now() - start > capMs) {
-          done();
-          return;
-        }
-        const root = findSidebarRoot();
-        if (root) {
-          clearInterval(poll);
-          obs.observe(root, { childList: true, subtree: true });
-          quietTimer = setTimeout(done, quietMs);
-        }
-      }, pollMs);
+      }, 300);
     });
   }
 
@@ -1030,8 +1081,9 @@
   document.addEventListener('dragstart', onMouseDownOrDragCapture, true);
 
   async function boot() {
-    // Wait out React hydration before inserting anything into its tree.
-    await waitForSidebarSettled();
+    // Wait for a proven mount window (quiet + loaded + tail + min age)
+    // before inserting anything into React's tree.
+    await waitForMountWindow();
 
     ensureToolbar();
     syncRowCheckboxes();
@@ -1057,10 +1109,14 @@
       setTimeout(scheduleScan, delay);
     }
 
-    // Self-heal: if a ChatGPT rerender drops the docked bar, remount it.
+    // Self-heal: if a ChatGPT rerender drops the header control, remount
+    // it — but only when calm, so re-insertion can never race hydration
+    // or churn and trigger error #418 again. Re-anchors the churn
+    // watcher first in case React swapped the sidebar subtree.
     // Cheap (one querySelector + list scan) and inert when all is well.
     setInterval(() => {
       try {
+        ensureQuietWatcher();
         ensureToolbar();
         syncRowCheckboxes();
       } catch {

@@ -34,8 +34,11 @@ The sidebar looks untouched until you select something:
 - Successes are removed from the sidebar immediately
 - Survives sidebar rerenders (MutationObserver + periodic self-heal);
   never touches ChatGPT's React internals or CSS class names
-- Injection waits for React hydration to settle (avoids hydration
-  mismatches); event listeners attach immediately since they touch no DOM
+- Injection waits for a proven mount window (sidebar calm 1.5s +
+  document loaded + tail delay + minimum page age, 25s cap) so it never
+  races React hydration (error #418); every re-insertion honors the same
+  gate, and the churn watcher re-anchors if React swaps the subtree;
+  event listeners attach immediately since they touch no DOM
 
 ## UI cleanup and sidebar behavior (all on by default)
 
