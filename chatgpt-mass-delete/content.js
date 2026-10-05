@@ -117,7 +117,26 @@
     const first = firstVisibleItem();
     if (!first) return null;
     const sidebar = first.closest('nav') || first.closest('aside');
-    if (sidebar) return { parent: sidebar, before: sidebar.firstChild };
+    // The sidebar can nest a narrow icon rail around the real panel
+    // (e.g. a ~40px tiny bar): anchoring to the rail crushes the header
+    // to 40px. Climb to the outermost >=200px panel below the sidebar
+    // root instead, so the card gets full sidebar width. Only runs on
+    // the rare mount path, never per-scan (getBoundingClientRect forces
+    // layout).
+    let panel = sidebar;
+    let el = first.parentElement;
+    let depth = 0;
+    while (el && el !== sidebar && depth++ < 12) {
+      let w = 0;
+      try {
+        w = el.getBoundingClientRect().width;
+      } catch {
+        // ignore and keep climbing
+      }
+      if (w >= 200) panel = el;
+      el = el.parentElement;
+    }
+    if (panel instanceof Element) return { parent: panel, before: panel.firstChild };
     const list = first.parentElement;
     if (list && list.parentNode instanceof Element) {
       return { parent: list.parentNode, before: list };
@@ -147,10 +166,26 @@
 
   function ensureToolbar() {
     if (!massDeleteEnabled()) return;
-    if (document.querySelector(`[${PREFIX}="toolbar"]`)) {
+    const anchor = findToolbarAnchor();
+    const existing = document.querySelector(`[${PREFIX}="toolbar"]`);
+    if (existing) {
+      // Relocate a rail-crushed bar (mounted by an older anchor into a
+      // ~40px icon rail) to the real sidebar panel — once it is calm.
+      if (anchor && sidebarQuiet) {
+        try {
+          const r = existing.getBoundingClientRect();
+          if (existing.parentElement !== anchor.parent && (r.width === 0 || r.width < 120)) {
+            anchor.parent.insertBefore(existing, anchor.before);
+            console.info('[ChatGPT Mass Delete] toolbar relocated to sidebar panel');
+          }
+        } catch {
+          // Keep it where it is; never break the host page.
+        }
+      }
       updateToolbar();
       return;
     }
+    if (!anchor) return; // Retried by scans + interval once chats render.
     // Never insert during churn/hydration — the interval retries once calm.
     if (!sidebarQuiet) return;
     const anchor = findToolbarAnchor();

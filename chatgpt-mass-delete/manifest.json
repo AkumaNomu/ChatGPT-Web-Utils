@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Mass Delete",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "description": "Select multiple ChatGPT sidebar conversations and delete them all at once. Plus optional UI cleanup (Upgrade, disclaimer) and collapsible projects.",
   "browser_specific_settings": {
     "gecko": {
