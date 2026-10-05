@@ -88,6 +88,45 @@
   // ---------------------------------------------------------------------------
   const seenUpgradeButtons = new WeakSet();
 
+  // Text comparison ignoring SVG internals (<title> etc.), which would
+  // otherwise poison exact "Upgrade" matches.
+  function upgradeText(el) {
+    try {
+      const clone = el.cloneNode(true);
+      for (const svg of clone.querySelectorAll('svg')) svg.remove();
+      return (clone.textContent || '').trim();
+    } catch {
+      return (el.textContent || '').trim();
+    }
+  }
+
+  function buttonSaysUpgrade(btn) {
+    if (btn.getAttribute('aria-label') === 'Upgrade') return true;
+    if (upgradeText(btn) === 'Upgrade') return true;
+    // Icon + label compositions: no direct text of its own, and every
+    // text-bearing child says exactly "Upgrade".
+    let direct = '';
+    try {
+      for (const node of btn.childNodes) {
+        if (node.nodeType === 3) direct += node.nodeValue || '';
+      }
+    } catch {
+      return false;
+    }
+    if (direct.trim() !== '') return false;
+    let hits = 0;
+    for (const child of btn.children) {
+      const t = upgradeText(child);
+      if (t === '') continue;
+      if (t === 'Upgrade') {
+        hits += 1;
+        continue;
+      }
+      return false; // Unrelated textual content — not ours to hide.
+    }
+    return hits >= 1;
+  }
+
   function hideUpgradeUI() {
     const buttons = document.getElementsByTagName('button');
     for (const btn of buttons) {
@@ -96,16 +135,14 @@
         seenUpgradeButtons.add(btn);
         continue;
       }
-      const label = btn.getAttribute('aria-label');
-      const text = (btn.textContent || '').trim();
-      if (label !== 'Upgrade' && text !== 'Upgrade') continue;
+      if (!buttonSaysUpgrade(btn)) continue;
 
       let container = btn;
       let guard = 0;
       while (guard++ < 5) {
         const parent = container.parentElement;
         if (!parent || STRUCTURAL_TAGS.test(parent.tagName)) break;
-        if ((parent.textContent || '').trim() !== 'Upgrade') break;
+        if (upgradeText(parent) !== 'Upgrade') break;
         container = parent;
       }
       container.setAttribute(HIDDEN_ATTR, 'upgrade');

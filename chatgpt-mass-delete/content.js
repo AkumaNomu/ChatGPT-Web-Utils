@@ -188,8 +188,6 @@
     if (!anchor) return; // Retried by scans + interval once chats render.
     // Never insert during churn/hydration — the interval retries once calm.
     if (!sidebarQuiet) return;
-    const anchor = findToolbarAnchor();
-    if (!anchor) return; // Retried by scans + interval once chats render.
 
     const toolbar = document.createElement('div');
     toolbar.setAttribute(PREFIX, 'toolbar');
