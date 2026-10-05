@@ -100,10 +100,22 @@
   // plus a status line for progress/results. The MutationObserver +
   // interval remount it if a rerender drops it.
   // ---------------------------------------------------------------------------
-  function findToolbarAnchor() {
+  function firstVisibleItem() {
     const items = findConversations();
-    if (items.length === 0) return null;
-    const first = items[0];
+    for (const item of items) {
+      try {
+        const r = item.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) return item;
+      } catch {
+        // ignore and keep looking
+      }
+    }
+    return items[0] || null;
+  }
+
+  function findToolbarAnchor() {
+    const first = firstVisibleItem();
+    if (!first) return null;
     const sidebar = first.closest('nav') || first.closest('aside');
     if (sidebar) return { parent: sidebar, before: sidebar.firstChild };
     const list = first.parentElement;
@@ -1072,9 +1084,29 @@
         return;
       }
       const cs = getComputedStyle(toolbar);
+      const r = toolbar.getBoundingClientRect();
+      const chain = [];
+      let el = toolbar.parentElement;
+      let depth = 0;
+      while (el && depth++ < 4) {
+        let desc = el.tagName;
+        if (el.id) desc += `#${el.id}`;
+        else if (el.getAttribute && el.getAttribute('role')) desc += `[role=${el.getAttribute('role')}]`;
+        chain.push(desc);
+        el = el.parentElement;
+      }
       console.info(
         '[ChatGPT Mass Delete] toolbar check: position=%s top=%s left=%s display=%s z=%s bg=%s',
         cs.position, cs.top, cs.left, cs.display, cs.zIndex, cs.backgroundColor
+      );
+      console.info(
+        '[ChatGPT Mass Delete] toolbar geometry: x=%d y=%d w=%d h=%d inLayout=%s path=%s',
+        Math.round(r.x),
+        Math.round(r.y),
+        Math.round(r.width),
+        Math.round(r.height),
+        toolbar.offsetParent !== null,
+        chain.join(' > ')
       );
     } catch {
       console.info('[ChatGPT Mass Delete] toolbar check: unavailable');
