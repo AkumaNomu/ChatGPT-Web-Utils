@@ -113,35 +113,96 @@
     return items[0] || null;
   }
 
-  function findToolbarAnchor() {
-    const first = firstVisibleItem();
-    if (!first) return null;
-    const sidebar = first.closest('nav') || first.closest('aside');
-    // The sidebar can nest a narrow icon rail around the real panel
-    // (e.g. a ~40px tiny bar): anchoring to the rail crushes the header
-    // to 40px. Climb to the outermost >=200px panel below the sidebar
-    // root instead, so the card gets full sidebar width. Only runs on
-    // the rare mount path, never per-scan (getBoundingClientRect forces
-    // layout).
-    let panel = sidebar;
-    let el = first.parentElement;
-    let depth = 0;
-    while (el && el !== sidebar && depth++ < 12) {
-      let w = 0;
-      try {
-        w = el.getBoundingClientRect().width;
-      } catch {
-        // ignore and keep climbing
+  // Anchor cascade: the sidebar DOM varies per page (icon rail beside
+  // slideover panel, virtualized lists, regenerating subtrees), so no
+  // single anchor works everywhere. Candidates are tried in order and the
+  // mounted result is verified visible (see scheduleMountVerify); on
+  // failure the next candidate is used. Body-fixed fallback is last and
+  // always safe (outside React's tree). Only runs on the rare mount
+  // path, never per-scan (getBoundingClientRect forces layout).
+  function anchorCandidates() {
+    const cands = [];
+    const seen = new Set();
+    const push = (parent, before, name) => {
+      if (parent instanceof Element && !seen.has(parent)) {
+        seen.add(parent);
+        cands.push({ parent, before, name });
       }
-      if (w >= 200) panel = el;
-      el = el.parentElement;
+    };
+    const first = firstVisibleItem();
+    if (first) {
+      const sidebar = first.closest('nav') || first.closest('aside');
+      let panel = null;
+      let el = first.parentElement;
+      let depth = 0;
+      while (el && el !== sidebar && depth++ < 12) {
+        let w = 0;
+        try {
+          w = el.getBoundingClientRect().width;
+        } catch {
+          // ignore and keep climbing
+        }
+        if (w >= 200) panel = el;
+        el = el.parentElement;
+      }
+      if (panel) push(panel, panel.firstChild, 'wide-panel');
+      const list = first.parentElement;
+      if (list && list.parentNode instanceof Element) {
+        push(list.parentNode, list, 'pre-list');
+      }
+      if (sidebar) push(sidebar, sidebar.firstChild, 'sidebar-top');
     }
-    if (panel instanceof Element) return { parent: panel, before: panel.firstChild };
-    const list = first.parentElement;
-    if (list && list.parentNode instanceof Element) {
-      return { parent: list.parentNode, before: list };
+    return cands;
+  }
+
+  let anchorIndex = 0;
+  let verifyTimer = null;
+
+  function mountLooksGood(tb) {
+    try {
+      const r = tb.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) return false;
+      if (r.left >= window.innerWidth || r.top >= window.innerHeight) return false;
+      if (r.right <= 0 || r.bottom <= 0) return false;
+      const cs = getComputedStyle(tb);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+      if (parseFloat(cs.opacity || '1') === 0) return false;
+      if (r.width < 120 && widePanelExists()) return false; // crushed in rail
+      return true;
+    } catch {
+      return true; // Never thrash on measurement errors.
     }
-    return null;
+  }
+
+  function widePanelExists() {
+    try {
+      for (const el of document.querySelectorAll('nav,aside')) {
+        if (el.getBoundingClientRect().width >= 200) return true;
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  }
+
+  function scheduleMountVerify() {
+    clearTimeout(verifyTimer);
+    verifyTimer = setTimeout(() => {
+      try {
+        const tb = document.querySelector(`[${PREFIX}="toolbar"]`);
+        if (!tb) {
+          ensureToolbar();
+          return;
+        }
+        if (mountLooksGood(tb)) return;
+        anchorIndex += 1;
+        tb.remove();
+        console.info('[ChatGPT Mass Delete] header not visible where mounted; trying next anchor');
+        ensureToolbar();
+      } catch {
+        // ignore
+      }
+    }, 800);
   }
 
   function getToolbarElements() {
@@ -166,29 +227,32 @@
 
   function ensureToolbar() {
     if (!massDeleteEnabled()) return;
-    const anchor = findToolbarAnchor();
-    const existing = document.querySelector(`[${PREFIX}="toolbar"]`);
-    if (existing) {
-      // Relocate a rail-crushed bar (mounted by an older anchor into a
-      // ~40px icon rail) to the real sidebar panel — once it is calm.
-      if (anchor && sidebarQuiet) {
-        try {
-          const r = existing.getBoundingClientRect();
-          if (existing.parentElement !== anchor.parent && (r.width === 0 || r.width < 120)) {
-            anchor.parent.insertBefore(existing, anchor.before);
-            console.info('[ChatGPT Mass Delete] toolbar relocated to sidebar panel');
-          }
-        } catch {
-          // Keep it where it is; never break the host page.
-        }
-      }
+    if (document.querySelector(`[${PREFIX}="toolbar"]`)) {
       updateToolbar();
       return;
     }
-    if (!anchor) return; // Retried by scans + interval once chats render.
-    // Never insert during churn/hydration — the interval retries once calm.
-    if (!sidebarQuiet) return;
+    const cands = anchorCandidates();
+    if (anchorIndex < cands.length) {
+      // In-sidebar inserts wait for calm so they never race hydration.
+      if (!sidebarQuiet) return;
+      const cand = cands[anchorIndex];
+      try {
+        buildAndMountToolbar(cand.parent, cand.before, cand.name);
+      } catch {
+        // Structure shifted under us — retry on next scan.
+      }
+      return;
+    }
+    // Last resort: compact floating bar. Always safe (outside React's
+    // tree) and vastly better than an invisible extension.
+    try {
+      buildAndMountToolbar(document.body, null, 'floating-fallback');
+    } catch {
+      // Retry later.
+    }
+  }
 
+  function buildAndMountToolbar(parent, before, name) {
     const toolbar = document.createElement('div');
     toolbar.setAttribute(PREFIX, 'toolbar');
 
@@ -269,16 +333,42 @@
     row.append(topbox, count, deleteBtn);
     toolbar.append(row, status);
 
-    try {
-      anchor.parent.insertBefore(toolbar, anchor.before);
-    } catch {
-      return; // Unexpected structure — retry on next scan.
+    if (name === 'floating-fallback') {
+      // Inline base styles: guaranteed visible even without the sheet.
+      toolbar.setAttribute(`${PREFIX}-mode`, 'floating-fallback');
+      toolbar.style.position = 'fixed';
+      toolbar.style.left = '12px';
+      toolbar.style.bottom = '12px';
+      toolbar.style.top = 'auto';
+      toolbar.style.zIndex = '2147483646';
+      toolbar.style.margin = '0';
+      toolbar.style.width = 'max-content';
+      toolbar.style.maxWidth = 'calc(100vw - 24px)';
+      toolbar.style.background = 'rgba(33, 33, 33, 0.9)';
+      toolbar.style.color = '#ececec';
+      toolbar.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+      toolbar.style.borderRadius = '12px';
+      toolbar.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.5)';
+      toolbar.style.padding = '10px';
+      if (document.body) {
+        document.body.appendChild(toolbar);
+      } else {
+        return;
+      }
+    } else {
+      try {
+        parent.insertBefore(toolbar, before);
+      } catch {
+        return; // Unexpected structure — retry on next scan.
+      }
     }
     updateToolbar();
     console.info(
-      '[ChatGPT Mass Delete] toolbar mounted (%d conversations detected)',
-      findConversations().length
+      '[ChatGPT Mass Delete] toolbar mounted (%d conversations detected, anchor=%s)',
+      findConversations().length,
+      name
     );
+    scheduleMountVerify();
   }
 
   function setStatus(message, mode) {

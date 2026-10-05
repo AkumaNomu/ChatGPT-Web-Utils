@@ -141,6 +141,19 @@
   font-weight: 500;
 }
 
+/* Last-resort floating placement (only used when no sidebar anchor
+   renders visibly). Compact and clear of the chat stream. */
+[data-chatgpt-mass-delete="toolbar"][data-chatgpt-mass-delete-mode="floating-fallback"] {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  top: auto;
+  z-index: 2147483646;
+  margin: 0;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+}
+
 /* ---------- Custom checkbox injected into each conversation row ---------- */
 [data-chatgpt-mass-delete="checkbox-wrapper"] {
   position: relative;
