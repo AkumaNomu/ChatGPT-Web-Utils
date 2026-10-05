@@ -14,8 +14,6 @@
   // apart. Mass delete only ever handles real conversations.
   const PROJECT_ROW_SELECTOR =
     '[data-sidebar-item="true"][data-sidebar-keep-open="true"][role="button"]';
-  const CONVERSATION_SELECTOR =
-    '[data-sidebar-item="true"]:not([data-sidebar-keep-open="true"])';
   const CONVERSATION_ID_PATTERN = /\/c\/([0-9a-f-]{8,})/i;
 
   // Absolute URLs: relative paths do NOT resolve in this content-script
@@ -75,7 +73,20 @@
   }
 
   function findConversations() {
-    return Array.from(document.querySelectorAll(CONVERSATION_SELECTOR));
+    const all = Array.from(document.querySelectorAll(SIDEBAR_ITEM_SELECTOR));
+    const convos = all.filter((el) => !el.matches('[data-sidebar-keep-open="true"]'));
+    // Graceful degradation: if keep-open marks EVERYTHING, it does not
+    // discriminate on this DOM — treat all rows as conversations rather
+    // than going silently dead (project features simply won't split).
+    return convos.length > 0 ? convos : all;
+  }
+
+  function countProjectRows() {
+    try {
+      return document.querySelectorAll(PROJECT_ROW_SELECTOR).length;
+    } catch {
+      return 0;
+    }
   }
 
   function findItemForId(id) {
@@ -1084,6 +1095,13 @@
     // Wait for a proven mount window (quiet + loaded + tail + min age)
     // before inserting anything into React's tree.
     await waitForMountWindow();
+
+    console.info(
+      '[ChatGPT Mass Delete] mount window open: items=%d convos=%d projects=%d',
+      document.querySelectorAll(SIDEBAR_ITEM_SELECTOR).length,
+      findConversations().length,
+      countProjectRows()
+    );
 
     ensureToolbar();
     syncRowCheckboxes();

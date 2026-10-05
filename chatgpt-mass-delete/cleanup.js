@@ -183,15 +183,23 @@
     let tagged = 0;
 
     // (0) Definitive project rows (stable semantic selector).
-    for (const row of root.querySelectorAll(PROJECT_ROW_SELECTOR)) {
-      if (row.closest('[data-chatgpt-mass-delete]')) continue;
-      const region = siblingPanel(row, totalItems) || childPanel(row, null, totalItems);
-      if (region instanceof Element) {
-        if (tagPair(row, region)) tagged += 1;
-      } else {
-        // Row with no discoverable chats yet: mark it so clicks/hover
-        // are still managed once its conversations render.
-        row.setAttribute(ENTRY_ATTR, ENTRY_VALUE);
+    // Safety: if NO plain conversation exists, keep-open does not
+    // discriminate on this DOM — tagging everything would suppress all
+    // sidebar navigation, so skip project handling entirely.
+    const plainConvos = root.querySelectorAll(
+      '[data-sidebar-item="true"]:not([data-sidebar-keep-open="true"])'
+    ).length;
+    if (plainConvos > 0) {
+      for (const row of root.querySelectorAll(PROJECT_ROW_SELECTOR)) {
+        if (row.closest('[data-chatgpt-mass-delete]')) continue;
+        const region = siblingPanel(row, totalItems) || childPanel(row, null, totalItems);
+        if (region instanceof Element) {
+          if (tagPair(row, region)) tagged += 1;
+        } else {
+          // Row with no discoverable chats yet: mark it so clicks/hover
+          // are still managed once its conversations render.
+          row.setAttribute(ENTRY_ATTR, ENTRY_VALUE);
+        }
       }
     }
 
